@@ -1,0 +1,30 @@
+metadata:
+  name: gep1
+  type: afcgi
+
+klm:
+  home: /opt/openspace
+  bundle_root: ./bundles
+
+  core:
+    version: 0.1.0
+    file: ../klm-core-0.1.0.tgz
+
+  bundles:
+    - name: basekit
+      type: infrastructure
+      version: 0.1.0
+      file: basekit-0.1.0.tgz
+      enabled: true
+
+    - name: onboarder
+      type: infrastructure
+      version: 3.8.0
+      file: onboarder-3.8.0.tgz
+      enabled: true
+
+# Keep the rest of your deployment configuration below.
+# site:
+#   domain_name: example.local
+# networks: {}
+# clusters: {}
