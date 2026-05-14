@@ -273,6 +273,8 @@ case "${1:-}" in
     ;;
   *)
     load_klm_home
+    export KLM_HOME
+
     KLM_PY="$KLM_HOME/core/current/bin/klm.py"
     [[ -f "$KLM_PY" ]] || die "KLM core is not installed. Run: klm bootstrap --config <deployment.yml>"
     exec python3 "$KLM_PY" "$@"

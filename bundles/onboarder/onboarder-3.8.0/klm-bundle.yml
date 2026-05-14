@@ -1,0 +1,41 @@
+apiVersion: klm.kratos/v1
+kind: Bundle
+
+metadata:
+  name: onboarder
+  displayName: Onboarder
+  version: 3.8.0
+
+type: infrastructure
+
+tasks:
+  - id: load
+    task: load
+    label: load
+    description: Load the onboarder container image into Podman or Docker.
+
+  - id: run
+    task: run
+    label: run
+    description: Start the onboarder container with the current KLM environment mounted.
+
+  - id: apply
+    task: apply
+    label: apply
+    description: Run the onboarder deployment command inside the container.
+
+  - id: verify
+    task: verify
+    label: verify
+    description: Run onboarder verification inside the container.
+
+  - id: shell
+    task: shell
+    label: shell
+    interactive: true
+    description: Open an interactive shell inside the onboarder container.
+
+  - id: stop
+    task: stop
+    label: stop
+    description: Stop and remove the onboarder container.

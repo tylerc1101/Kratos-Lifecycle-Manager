@@ -1,0 +1,230 @@
+version: '3'
+
+vars:
+  TEST_BUNDLE_DIR: /home/kratos/bundles
+
+tasks:
+  bundle:list:
+    desc: Show locally available bundle source directories
+    cmds:
+      - find ./bundles -mindepth 1 -maxdepth 1 -type d | sort
+
+  bundle:build:
+    desc: Build a bundle with NAME=<bundle> VERSION=<version>
+    requires:
+      vars:
+        - NAME
+        - VERSION
+    vars:
+      BUNDLE_SRC_ROOT: "{{.TASKFILE_DIR}}/bundles/{{.NAME}}"
+      BUNDLE_DIR: "{{.BUNDLE_SRC_ROOT}}/{{.NAME}}-{{.VERSION}}"
+      OUTPUT_FILE: "{{.TEST_BUNDLE_DIR}}/{{.NAME}}-{{.VERSION}}.bundle"
+    cmds:
+      - test -d "{{.BUNDLE_DIR}}" || { echo "Missing bundle dir {{.BUNDLE_DIR}}"; exit 1; }
+
+      - mkdir -p "{{.TEST_BUNDLE_DIR}}"
+
+      - rm -f "{{.OUTPUT_FILE}}"
+
+      - |
+          tar -czf "{{.OUTPUT_FILE}}" \
+            -C "{{.BUNDLE_SRC_ROOT}}" \
+            "{{.NAME}}-{{.VERSION}}"
+
+      - echo
+      - echo "Created:"
+      - echo "  {{.OUTPUT_FILE}}"
+
+      - echo
+      - echo "Bundle contents:"
+      - tar -tzf "{{.OUTPUT_FILE}}" | head -20
+
+
+  bundle:check:
+    desc: Validate a built bundle with NAME=<bundle> VERSION=<version>
+    silent: true
+    requires:
+      vars:
+        - NAME
+        - VERSION
+    vars:
+      OUTPUT_FILE: "{{.TEST_BUNDLE_DIR}}/{{.NAME}}-{{.VERSION}}.bundle"
+      ROOT_DIR: "{{.NAME}}-{{.VERSION}}"
+    cmds:
+      - test -f "{{.OUTPUT_FILE}}" || { echo "Missing {{.OUTPUT_FILE}}"; exit 1; }
+
+      - |
+          tar -tzf "{{.OUTPUT_FILE}}" | head -1 | grep -q "^{{.ROOT_DIR}}/" || {
+            echo "Bad bundle root layout"
+            exit 1
+          }
+
+      - |
+          if [ "{{.NAME}}" = "klm-core" ]; then
+            tar -tzf "{{.OUTPUT_FILE}}" | grep -q "^{{.ROOT_DIR}}/klm-core.yml$" || {
+              echo "Missing klm-core.yml"
+              exit 1
+            }
+
+            tar -tzf "{{.OUTPUT_FILE}}" | grep -q "^{{.ROOT_DIR}}/bin/klm.py$" || {
+              echo "Missing bin/klm.py"
+              exit 1
+            }
+
+            tar -tzf "{{.OUTPUT_FILE}}" | grep -q "^{{.ROOT_DIR}}/klm_core/cli.py$" || {
+              echo "Missing klm_core/cli.py"
+              exit 1
+            }
+          else
+            tar -tzf "{{.OUTPUT_FILE}}" | grep -q "^{{.ROOT_DIR}}/klm-bundle.yml$" || {
+              echo "Missing klm-bundle.yml"
+              exit 1
+            }
+
+            tar -tzf "{{.OUTPUT_FILE}}" | grep -q "^{{.ROOT_DIR}}/Taskfile.yml$" || {
+              echo "Missing Taskfile.yml"
+              exit 1
+            }
+          fi
+
+      - echo "Bundle layout looks valid."
+
+  bundle:rebuild:
+    desc: Build and validate a bundle
+    requires:
+      vars:
+        - NAME
+        - VERSION
+    cmds:
+      - task bundle:build NAME={{.NAME}} VERSION={{.VERSION}}
+      - task bundle:check NAME={{.NAME}} VERSION={{.VERSION}}
+
+  bundle:extract:
+    desc: Extract a bundle with FILE=<bundle-file>
+    requires:
+      vars:
+        - FILE
+    cmds:
+      - mkdir -p /tmp/klm-bundle-test
+      - rm -rf /tmp/klm-bundle-test/*
+      - tar -xzf "{{.FILE}}" -C /tmp/klm-bundle-test
+      - tree /tmp/klm-bundle-test || find /tmp/klm-bundle-test
+
+  bundle:clean:
+    desc: Remove generated test bundles
+    cmds:
+      - rm -f {{.TEST_BUNDLE_DIR}}/*.bundle
+
+  bundle:build:core:
+    desc: Build KLM core bundle
+    cmds:
+      - task bundle:rebuild NAME=klm-core VERSION=0.1.0
+
+  bundle:build:onboarder:
+    desc: Build onboarder bundle
+    cmds:
+      - task bundle:rebuild NAME=onboarder VERSION=3.8.0
+
+  bundle:build:basekit:
+    desc: Build basekit bundle
+    cmds:
+      - task bundle:rebuild NAME=basekit VERSION=0.1.0
+
+  klm:install-launcher:
+    desc: Install the lightweight klm launcher to /usr/local/bin/klm
+    cmds:
+      - install -m 0755 "{{.TASKFILE_DIR}}/klm" /usr/local/bin/klm
+      - klm help || true
+
+  klm:bootstrap:
+    desc: Bootstrap KLM using the test deployment file
+    deps:
+      - bundle:core:rebuild
+    cmds:
+      - klm bootstrap --config "{{.DEPLOYMENT_FILE}}"
+
+  klm:init:
+    desc: Initialize KLM environment from the test deployment file
+    cmds:
+      - klm init --config "{{.DEPLOYMENT_FILE}}"
+
+  klm:test:
+    desc: Rebuild core, bootstrap, init, validate, and show tasks
+    cmds:
+      - task bundle:core:rebuild
+      - task klm:bootstrap
+      - task klm:init
+      - klm status
+      - klm validate
+      - klm bundle list
+      - klm tasks
+
+  git:status:
+    desc: Show git status
+    cmds:
+      - git status --short --branch
+
+  git:diff:
+    desc: Show git diff
+    cmds:
+      - git diff
+
+  git:add:
+    desc: Stage all changes
+    cmds:
+      - git add .
+
+  git:commit:
+    desc: Commit staged changes with MSG="message"
+    requires:
+      vars:
+        - MSG
+    cmds:
+      - git commit -m "{{.MSG}}"
+
+  git:push:
+    desc: Push current branch
+    cmds:
+      - git push
+
+  git:pull:
+    desc: Pull latest changes
+    cmds:
+      - git pull --ff-only
+
+  git:save:
+    desc: Add, commit, and push with MSG="message"
+    requires:
+      vars:
+        - MSG
+    cmds:
+      - git add .
+      - git status --short
+      - git commit -m "{{.MSG}}"
+      - git push
+
+  git:log:
+    desc: Show recent commit history
+    cmds:
+      - git log --oneline --decorate -10
+
+  git:branch:
+    desc: Show current branch
+    cmds:
+      - git branch --show-current
+
+  git:tag:
+    desc: Create a git tag with TAG="v0.1.0"
+    requires:
+      vars:
+        - TAG
+    cmds:
+      - git tag "{{.TAG}}"
+
+  git:tag:push:
+    desc: Push a git tag with TAG="v0.1.0"
+    requires:
+      vars:
+        - TAG
+    cmds:
+      - git push origin "{{.TAG}}"
