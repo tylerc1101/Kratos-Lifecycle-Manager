@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 import argparse
 import os
@@ -7,6 +8,7 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 try:
     import yaml
@@ -78,12 +80,12 @@ def resolve_relative(base_dir: Path, value: str) -> Path:
     return (base_dir / p).resolve()
 
 
-def config_env_name(config: dict, fallback: str | None = None) -> str:
+def config_env_name(config: dict, fallback: Optional[str] = None) -> str:
     metadata = config.get("metadata") or {}
     return str(metadata.get("name") or config.get("env_name") or fallback or "").strip()
 
 
-def deployment_bundle_root(config_path: Path, config: dict, override: str | None = None) -> Path:
+def deployment_bundle_root(config_path: Path, config: dict, override: Optional[str] = None) -> Path:
     if override:
         return resolve_relative(Path.cwd(), override)
     klm = config.get("klm") or {}
