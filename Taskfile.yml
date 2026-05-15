@@ -27,6 +27,23 @@ tasks:
       - rm -f "{{.OUTPUT_FILE}}"
 
       - |
+          if [ "{{.NAME}}" = "onboarder" ]; then
+            mkdir -p "{{.BUNDLE_DIR}}/files"
+
+            IMAGE_FILE="$(find {{.TASKFILE_DIR}}/images -maxdepth 1 -type f \( -name '*.tar' -o -name '*.tar.gz' -o -name '*.tgz' \) | head -n1)"
+
+            if [ -z "$IMAGE_FILE" ]; then
+              echo "No onboarder image found under ./images"
+              exit 1
+            fi
+
+            echo "Using onboarder image:"
+            echo "  $IMAGE_FILE"
+
+            cp -f "$IMAGE_FILE" "{{.BUNDLE_DIR}}/files/"
+          fi
+
+      - |
           tar -czf "{{.OUTPUT_FILE}}" \
             -C "{{.BUNDLE_SRC_ROOT}}" \
             "{{.NAME}}-{{.VERSION}}"
