@@ -1,0 +1,23 @@
+required_files:
+  - manifest.yml
+  - Taskfile.yml
+  - bin/klm-launcher.sh
+  - automation/cli/klm_cli.py
+  - automation/init/init.sh
+
+required_dirs:
+  - automation
+  - bin
+
+executables:
+  - bin/klm-launcher.sh
+  - automation/cli/klm_cli.py
+  - automation/init/init.sh
+
+pre_build: []
+
+exclude:
+  - build-manifest.yml
+  - "*.bundle"
+  - tmp
+  - logs

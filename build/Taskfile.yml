@@ -1,0 +1,18 @@
+version: '3'
+
+tasks:
+  bundle:
+    desc: Build all bundles
+    cmds:
+      - ./build-bundle.sh ../bundles/klm-core
+      - ./build-bundle.sh ../bundles/onboarder
+      - ./build-bundle.sh ../bundles/basekit
+      - ./build-bundle.sh ../bundles/afcgi
+
+  bundle:klm-core:
+    cmds:
+      - ./build-bundle.sh ../bundles/klm-core
+
+  bundle:onboarder:
+    cmds:
+      - ./build-bundle.sh ../bundles/onboarder

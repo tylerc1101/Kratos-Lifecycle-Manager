@@ -1,0 +1,14 @@
+name: klm-core
+version: 0.1.0
+type: infrastructure
+
+description: KLM-Core provides the core components and automation for running the Kratos Lifecycle Manager (KLM)
+
+path:
+  add:
+    - bin
+
+requires:
+  commands:
+    - python3
+    - tar
