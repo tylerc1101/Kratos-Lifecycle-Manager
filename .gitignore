@@ -49,8 +49,12 @@ sandbox/
 # Large Offline Images
 # =========================================
 
-images/*
-!images/.gitkeep
+**/images/*
+!**/images/.gitkeep
+# Generated extracted images
+**/*.tar
+**/*.tar.gz
+**/*.oci
 
 # =========================================
 # Runtime Files

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+shopt -s nullglob
 
 BUNDLE_DIR="${1:-}"
 DIST_DIR="${DIST_DIR:-dist}"
@@ -16,14 +17,18 @@ log() {
 usage() {
   cat <<EOF
 Usage:
-  ./scripts/build-bundle.sh <bundle_dir>
+  ./build-bundle.sh <bundle_dir>
 
 Example:
-  ./scripts/build-bundle.sh bundles/klm-core
+  ./build-bundle.sh bundles/klm-core
 
 Optional:
-  DIST_DIR=./dist ./scripts/build-bundle.sh bundles/klm-core
+  DIST_DIR=./dist ./build-bundle.sh bundles/klm-core
 EOF
+}
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
 [[ -n "$BUNDLE_DIR" ]] || {
@@ -40,12 +45,8 @@ DIST_DIR="$REPO_ROOT/$DIST_DIR"
 RUNTIME_MANIFEST="$BUNDLE_DIR/manifest.yml"
 BUILD_MANIFEST="$BUNDLE_DIR/build-manifest.yml"
 
-[[ -f "$RUNTIME_MANIFEST" ]] || die "Missing runtime manifest: $RUNTIME_MANIFEST"
-[[ -f "$BUILD_MANIFEST" ]] || die "Missing build manifest: $BUILD_MANIFEST"
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
-}
+[[ -f "$RUNTIME_MANIFEST" ]] || die "Missing manifest.yml: $RUNTIME_MANIFEST"
+[[ -f "$BUILD_MANIFEST" ]] || die "Missing build-manifest.yml: $BUILD_MANIFEST"
 
 need_cmd python3
 need_cmd tar
@@ -67,7 +68,6 @@ with open(file_path, "r", encoding="utf-8") as f:
     data = yaml.safe_load(f) or {}
 
 cur = data
-
 for part in key_path:
     if not isinstance(cur, dict) or part not in cur:
         print("")
@@ -96,7 +96,6 @@ with open(file_path, "r", encoding="utf-8") as f:
     data = yaml.safe_load(f) or {}
 
 cur = data
-
 for part in key_path:
     if not isinstance(cur, dict) or part not in cur:
         sys.exit(0)
@@ -112,9 +111,19 @@ safe_name_check() {
   local name="$1"
 
   [[ -n "$name" ]] || die "Name is empty"
-  [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "Unsafe name: $name"
-  [[ "$name" != "." ]] || die "Invalid name"
-  [[ "$name" != ".." ]] || die "Invalid name"
+  [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || die "Unsafe name/version: $name"
+  [[ "$name" != "." ]] || die "Invalid name/version"
+  [[ "$name" != ".." ]] || die "Invalid name/version"
+}
+
+validate_glob_matches() {
+  local label="$1"
+  local pattern="$2"
+  local matches=()
+
+  matches=( "$BUNDLE_DIR"/$pattern )
+
+  [[ "${#matches[@]}" -gt 0 ]] || die "$label matched nothing: $pattern"
 }
 
 NAME="$(yaml_get "$RUNTIME_MANIFEST" "name")"
@@ -147,6 +156,13 @@ while IFS= read -r dir; do
   [[ -d "$BUNDLE_DIR/$dir" ]] || die "Required directory missing: $dir"
 done < <(yaml_list "$BUILD_MANIFEST" "required_dirs")
 
+log "Validating included files"
+
+while IFS= read -r pattern; do
+  [[ -z "$pattern" ]] && continue
+  validate_glob_matches "include_files pattern" "$pattern"
+done < <(yaml_list "$BUILD_MANIFEST" "include_files")
+
 log "Running pre-build commands"
 
 while IFS= read -r cmd; do
@@ -159,10 +175,7 @@ log "Setting executable permissions"
 
 while IFS= read -r exe; do
   [[ -z "$exe" ]] && continue
-
-  if [[ ! -f "$BUNDLE_DIR/$exe" ]]; then
-    die "Executable listed but file not found: $exe"
-  fi
+  [[ -f "$BUNDLE_DIR/$exe" ]] || die "Executable listed but file not found: $exe"
 
   chmod +x "$BUNDLE_DIR/$exe"
   log "  chmod +x $exe"

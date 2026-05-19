@@ -1,16 +1,29 @@
 executables:
   - bin/klm-launcher.sh
-  - automation/cli/klm_cli.py
-  - automation/init.sh
+  - cli/klm_cli.py
+  - actions/init/init.sh
+  - actions/tools/install-task.sh
+  - actions/tools/install-ansible.sh
 
 required_files:
   - manifest.yml
   - Taskfile.yml
-  - automation/init.sh
+  - actions/init/init.sh
+  - actions/tools/install-task.sh
+  - actions/tools/install-ansible.sh
+  - images/task/task
 
 required_dirs:
-  - automation
+  - actions
   - bin
+  - cli
+  - images
+  - images/task
+  - images/ansible
+
+include_files:
+  - images/task/task
+  - images/ansible/*
 
 exclude:
   - build-manifest.yml
