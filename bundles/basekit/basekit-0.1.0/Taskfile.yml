@@ -1,27 +1,18 @@
 version: '3'
 
 tasks:
-  render:
-    desc: Render basekit generated files
+  full-install:
+    desc: Complete Basekit Reference Architecture Install
     cmds:
-      - mkdir -p "{{.KLM_GENERATED_DIR}}/basekit" "{{.KLM_INVENTORY_DIR}}"
-      - |
-          cat > "{{.KLM_GENERATED_DIR}}/basekit/README.txt" <<EOF
-          Basekit render placeholder.
-          Environment: {{.KLM_ENV_NAME}}
-          Config: {{.KLM_CONFIG}}
-          EOF
-      - echo "[basekit] Render complete."
+      - task:
+      - task:
+      - task:
 
-  apply:
-    desc: Apply basekit architecture
-    deps: [render]
+  node-prep:
+    desc: Prepare nodes
     cmds:
-      - echo "[basekit] Apply placeholder."
-      - echo "[basekit] Put libvirt, VM, bridge, inventory, and architecture tasks here."
+      - task: klm:playbook
+        vars:
+          PLAYBOOK: node-prep.yml
+          HOSTS: "{{.HOSTS}}"
 
-  verify:
-    desc: Verify basekit architecture
-    cmds:
-      - test -f "{{.KLM_CONFIG}}"
-      - echo "[basekit] Verify placeholder complete."
