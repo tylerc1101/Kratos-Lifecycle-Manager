@@ -112,6 +112,7 @@ find_bundle_root() {
 install_bundle() {
   local bundle_file="$1"
 
+  [[ -f "$bundle_file" ]] || die "Bundle is not a file: $bundle_file"
   [[ -f "$bundle_file" ]] || die "Bundle not found: $bundle_file"
 
   local tmp_dir
@@ -200,8 +201,8 @@ run_core_init() {
   local init_sh
   local init_py
 
-  init_sh="$KLM_BUNDLES_DIR/klm-core/automation/init/init.sh"
-  init_py="$KLM_BUNDLES_DIR/klm-core/automation/init/init.py"
+  init_sh="$KLM_BUNDLES_DIR/klm-core/automation/init.sh"
+  init_py="$KLM_BUNDLES_DIR/klm-core/automation/init.py"
 
   export KLM_HOME
   export KLM_ENV_NAME
@@ -312,11 +313,6 @@ as_root mkdir -p "$KLM_HOME/bin"
 as_root mkdir -p "$KLM_ENV_DIR"
 as_root mkdir -p "$KLM_BUNDLES_DIR"
 
-log "Installing lightweight KLM launcher"
-
-as_root install -m 0755 \
-  "$KLM_BUNDLES_DIR/klm-core/bin/klm-launcher.sh" \
-  "$KLM_HOME/bin/klm"
 
 log "Copying deployment.yml"
 
@@ -334,14 +330,16 @@ write_env_envfile
 log "Installing KLM profile"
 
 as_root tee /etc/profile.d/klm.sh >/dev/null <<EOF
-export PATH="\$PATH:\$KLM_HOME/bin"
+export PATH="\$PATH:$KLM_HOME/bin"
 EOF
 
+log "Installing lightweight KLM launcher"
+
+as_root install -m 0755 \
+  "$KLM_BUNDLES_DIR/klm-core/bin/klm-launcher.sh" \
+  "$KLM_HOME/bin/klm"
+
 as_root chmod 0644 /etc/profile.d/klm.sh
-
-log "Exporting Path"
-
-as_root export PATH="$PATH:$KLM_HOME/bin"
 
 log "Setting ownership"
 

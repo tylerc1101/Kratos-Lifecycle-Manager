@@ -1,12 +1,12 @@
 executables:
   - bin/klm-launcher.sh
   - automation/cli/klm_cli.py
-  - automation/init/init.sh
+  - automation/init.sh
 
 required_files:
   - manifest.yml
   - Taskfile.yml
-  - automation/init/init.sh
+  - automation/init.sh
 
 required_dirs:
   - automation

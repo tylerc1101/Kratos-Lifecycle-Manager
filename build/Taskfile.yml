@@ -4,15 +4,16 @@ tasks:
   bundle:
     desc: Build all bundles
     cmds:
-      - ./build-bundle.sh ../bundles/klm-core
-      - ./build-bundle.sh ../bundles/onboarder
-      - ./build-bundle.sh ../bundles/basekit
-      - ./build-bundle.sh ../bundles/afcgi
+      - bash ./build-bundle.sh ../bundles/klm-core
+      - bash ./build-bundle.sh ../bundles/onboarder
+      - bash ./build-bundle.sh ../bundles/basekit
+      - bash ./build-bundle.sh ../bundles/afcgi
 
   bundle:klm-core:
+    desc: Build klm-core bundle
     cmds:
-      - ./build-bundle.sh ../bundles/klm-core
+      - bash ./build-bundle.sh ../bundles/klm-core
 
   bundle:onboarder:
     cmds:
-      - ./build-bundle.sh ../bundles/onboarder
+      - bash ./build-bundle.sh ../bundles/onboarder

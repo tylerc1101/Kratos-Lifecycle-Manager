@@ -70,16 +70,16 @@ select_env() {
 
   [[ "${#envs[@]}" -gt 0 ]] || die "No KLM environments found in $KLM_ENV_ROOT"
 
-  echo
-  echo "Select KLM Environment"
-  echo "======================"
+  echo >&2
+  echo "Select KLM Environment" >&2
+  echo "======================" >&2
 
   for index in "${!envs[@]}"; do
-    printf '%s) %s\n' "$((index + 1))" "${envs[$index]}"
+    printf '%s) %s\n' "$((index + 1))" "${envs[$index]}" >&2
   done
 
-  echo "q) Quit"
-  echo
+  echo "q) Quit" >&2
+  echo >&2
 
   read -rp "Select option: " choice
 

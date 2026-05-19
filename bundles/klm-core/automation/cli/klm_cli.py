@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
+
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 
-def die(message: str, code: int = 1):
+def die(message, code=1):
     print(f"[klm][ERROR] {message}", file=sys.stderr)
     sys.exit(code)
 
@@ -21,7 +23,7 @@ def run_capture(cmd, cwd=None, env=None):
     )
 
 
-def choose(title: str, options: list[str]) -> str:
+def choose(title, options):
     while True:
         print()
         print(title)
@@ -45,30 +47,28 @@ def choose(title: str, options: list[str]) -> str:
         print("[klm] Invalid selection")
 
 
-def get_required_env(name: str) -> str:
+def get_required_env(name):
     value = os.environ.get(name, "").strip()
     if not value:
         die(f"Missing required environment variable: {name}")
     return value
 
 
-def discover_bundles(bundles_dir: Path) -> list[Path]:
+def discover_bundles(bundles_dir):
     if not bundles_dir.exists():
         die(f"Bundles directory not found: {bundles_dir}")
 
-    bundles = []
-
-    for path in bundles_dir.iterdir():
-        if not path.is_dir():
-            continue
-
-        if (path / "Taskfile.yml").exists():
-            bundles.append(path)
-
-    return sorted(bundles, key=lambda p: p.name.lower())
+    return sorted(
+        [
+            path
+            for path in bundles_dir.iterdir()
+            if path.is_dir() and (path / "Taskfile.yml").exists()
+        ],
+        key=lambda p: p.name.lower(),
+    )
 
 
-def build_runtime_env(env_dir: Path, bundles_dir: Path) -> dict:
+def build_runtime_env(env_dir, bundles_dir):
     env = os.environ.copy()
 
     path_entries = []
@@ -81,16 +81,14 @@ def build_runtime_env(env_dir: Path, bundles_dir: Path) -> dict:
         if bundle_bin.exists():
             path_entries.append(str(bundle_bin))
 
-    current_path = env.get("PATH", "")
-    env["PATH"] = ":".join(path_entries + [current_path])
-
+    env["PATH"] = ":".join(path_entries + [env.get("PATH", "")])
     env["KLM_ENV_DIR"] = str(env_dir)
     env["KLM_BUNDLES_DIR"] = str(bundles_dir)
 
     return env
 
 
-def get_bundle_tasks(bundle_dir: Path, env: dict) -> list[dict]:
+def get_bundle_tasks(bundle_dir, env):
     taskfile = bundle_dir / "Taskfile.yml"
 
     result = run_capture(
@@ -100,33 +98,28 @@ def get_bundle_tasks(bundle_dir: Path, env: dict) -> list[dict]:
             str(taskfile),
             "--dir",
             str(bundle_dir),
-            "--list",
+            "--json",
+            "--list-all",
         ],
         cwd=bundle_dir,
         env=env,
     )
 
     if result.returncode != 0:
+        print(result.stderr, file=sys.stderr)
+        return []
+
+    try:
+        data = json.loads(result.stdout)
+    except Exception as exc:
+        print(f"[klm][WARN] Failed to parse task JSON for {bundle_dir.name}: {exc}", file=sys.stderr)
         return []
 
     tasks = []
 
-    for raw_line in result.stdout.splitlines():
-        line = raw_line.strip()
-
-        if not line.startswith("* "):
-            continue
-
-        line = line[2:].strip()
-
-        if ":" in line:
-            task_name, desc = line.split(":", 1)
-        else:
-            task_name = line
-            desc = ""
-
-        task_name = task_name.strip()
-        desc = desc.strip()
+    for item in data.get("tasks", []):
+        task_name = str(item.get("name", "")).strip()
+        desc = str(item.get("desc", "") or "").strip()
 
         if not task_name:
             continue
@@ -144,7 +137,7 @@ def get_bundle_tasks(bundle_dir: Path, env: dict) -> list[dict]:
     return tasks
 
 
-def build_task_menu(bundles_dir: Path, env: dict) -> list[dict]:
+def build_task_menu(bundles_dir, env):
     all_tasks = []
 
     for bundle in discover_bundles(bundles_dir):
@@ -153,7 +146,7 @@ def build_task_menu(bundles_dir: Path, env: dict) -> list[dict]:
     return all_tasks
 
 
-def run_task(task: dict, env: dict) -> int:
+def run_task(task, env):
     cmd = [
         "task",
         "--taskfile",
@@ -171,7 +164,7 @@ def run_task(task: dict, env: dict) -> int:
     return subprocess.run(cmd, env=env).returncode
 
 
-def direct_task_from_args(args: list[str], tasks: list[dict]) -> dict | None:
+def direct_task_from_args(args, tasks):
     if not args:
         return None
 
@@ -179,7 +172,6 @@ def direct_task_from_args(args: list[str], tasks: list[dict]) -> dict | None:
 
     for task in tasks:
         full_name = f"{task['bundle']}:{task['task']}"
-
         if requested == full_name:
             return task
 
@@ -208,16 +200,47 @@ def main():
         sys.exit(run_task(selected_direct, runtime_env))
 
     while True:
-        labels = []
+        indexed_tasks = []
+        counter = 1
+
+        print()
+        print(f"KLM Tasks for {env_name}")
+        print("=" * (14 + len(env_name)))
+
+        current_bundle = None
 
         for task in tasks:
-            label = f"{task['bundle']}:{task['task']}"
-            if task["desc"]:
-                label += f" - {task['desc']}"
-            labels.append(label)
+            if task["bundle"] != current_bundle:
+                current_bundle = task["bundle"]
+                print()
+                print(current_bundle)
+                print("=" * len(current_bundle))
 
-        selected_label = choose(f"KLM Tasks for {env_name}", labels)
-        selected_task = tasks[labels.index(selected_label)]
+            desc = f" - {task['desc']}" if task["desc"] else ""
+            print(f"{counter}) {task['task']}{desc}")
+
+            indexed_tasks.append(task)
+            counter += 1
+
+        print()
+        print("q) Quit")
+
+        choice = input("\nSelect task: ").strip()
+
+        if choice.lower() in {"q", "quit", "exit"}:
+            sys.exit(0)
+
+        if not choice.isdigit():
+            print("[klm] Invalid selection")
+            continue
+
+        selected_index = int(choice)
+
+        if selected_index < 1 or selected_index > len(indexed_tasks):
+            print("[klm] Invalid selection")
+            continue
+
+        selected_task = indexed_tasks[selected_index - 1]
 
         rc = run_task(selected_task, runtime_env)
 
@@ -225,6 +248,7 @@ def main():
         print(f"[klm] Exit code: {rc}")
 
         again = input("\nReturn to task menu? [Y/n]: ").strip().lower()
+
         if again in {"n", "no"}:
             sys.exit(rc)
 
