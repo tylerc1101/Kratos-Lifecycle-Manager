@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-KLM_GLOBAL_ENV="/etc/klm/klm.env"
 MANIFEST_FILE="manifest.yml"
 
 die() {
@@ -33,7 +32,7 @@ Usage:
   ./klm-init.sh --config <deployment.yml> --bundles <bundle...>
 
 Example:
-  ./klm-init.sh --config ./gep2.yml --bundles ./bundles/*
+  ./klm-init.sh --config ./deployment.yml --bundles ./dist/*.bundle
 
 Required deployment.yml values:
   all.vars.env_name
@@ -41,11 +40,6 @@ Required deployment.yml values:
   all.vars.klm.owner
   all.vars.klm.group
   all.vars.klm.core.version
-
-Bundle requirements:
-  - Each bundle must contain:
-      manifest.yml
-
 EOF
 }
 
@@ -69,7 +63,6 @@ for part in key_path:
     if not isinstance(cur, dict) or part not in cur:
         print("")
         sys.exit(0)
-
     cur = cur[part]
 
 print(cur if cur is not None else "")
@@ -109,109 +102,92 @@ find_bundle_root() {
   die "Invalid bundle: missing $MANIFEST_FILE"
 }
 
-install_bundle() {
+bundle_manifest_value() {
   local bundle_file="$1"
+  local key="$2"
+  local tmp_dir
+  local bundle_root
+  local manifest
+  local value
 
   [[ -f "$bundle_file" ]] || die "Bundle is not a file: $bundle_file"
-  [[ -f "$bundle_file" ]] || die "Bundle not found: $bundle_file"
 
-  local tmp_dir
   tmp_dir="$(mktemp -d)"
-
-  log "Extracting bundle: $bundle_file"
-
   tar -xzf "$bundle_file" -C "$tmp_dir"
 
-  local bundle_root
   bundle_root="$(find_bundle_root "$tmp_dir")"
-
-  local manifest
   manifest="$bundle_root/$MANIFEST_FILE"
 
-  local bundle_name
-  local bundle_version
+  value="$(yaml_get "$manifest" "$key")"
 
-  bundle_name="$(yaml_get "$manifest" "name")"
-  bundle_version="$(yaml_get "$manifest" "version")"
+  rm -rf "$tmp_dir"
 
-  [[ -n "$bundle_name" ]] || die "Bundle missing name in $MANIFEST_FILE"
-  [[ -n "$bundle_version" ]] || die "Bundle missing version in $MANIFEST_FILE"
+  printf '%s\n' "$value"
+}
 
-  safe_name_check "$bundle_name"
+find_core_bundle() {
+  local bundle
+  local name
+  local version
 
+  for bundle in "${BUNDLES[@]}"; do
+    [[ -f "$bundle" ]] || continue
+
+    name="$(bundle_manifest_value "$bundle" "name")"
+    version="$(bundle_manifest_value "$bundle" "version")"
+
+    if [[ "$name" == "klm-core" && "$version" == "$KLM_CORE_VERSION" ]]; then
+      printf '%s\n' "$bundle"
+      return
+    fi
+  done
+
+  die "Could not find klm-core bundle version $KLM_CORE_VERSION"
+}
+
+install_core_bundle() {
+  local core_bundle="$1"
+  local tmp_dir
+  local bundle_root
+  local manifest
+  local name
+  local version
   local target_dir
-  target_dir="$KLM_BUNDLES_DIR/$bundle_name"
 
-  log "Installing bundle:"
-  log "  Name: $bundle_name"
-  log "  Version: $bundle_version"
-  log "  Target: $target_dir"
+  [[ -f "$core_bundle" ]] || die "Core bundle is not a file: $core_bundle"
+
+  log "Installing bootstrap core bundle: $core_bundle"
+
+  tmp_dir="$(mktemp -d)"
+  tar -xzf "$core_bundle" -C "$tmp_dir"
+
+  bundle_root="$(find_bundle_root "$tmp_dir")"
+  manifest="$bundle_root/$MANIFEST_FILE"
+
+  name="$(yaml_get "$manifest" "name")"
+  version="$(yaml_get "$manifest" "version")"
+
+  [[ "$name" == "klm-core" ]] || die "Expected klm-core bundle, got: $name"
+  [[ "$version" == "$KLM_CORE_VERSION" ]] || die "Expected klm-core $KLM_CORE_VERSION, got: $version"
+
+  target_dir="$KLM_BUNDLES_DIR/klm-core"
 
   as_root rm -rf "$target_dir"
   as_root mkdir -p "$target_dir"
-
   as_root cp -a "$bundle_root/." "$target_dir/"
 
   rm -rf "$tmp_dir"
-}
 
-validate_core_bundle() {
-  local core_manifest
-  core_manifest="$KLM_BUNDLES_DIR/klm-core/$MANIFEST_FILE"
-
-  [[ -f "$core_manifest" ]] || die "klm-core bundle is required"
-
-  local installed_version
-  installed_version="$(yaml_get "$core_manifest" "version")"
-
-  [[ -n "$installed_version" ]] || die "klm-core manifest missing version"
-
-  if [[ "$installed_version" != "$KLM_CORE_VERSION" ]]; then
-    die "Installed klm-core version '$installed_version' does not match deployment.yml version '$KLM_CORE_VERSION'"
-  fi
-}
-
-write_global_env() {
-  log "Writing global KLM environment"
-
-  as_root mkdir -p /etc/klm
-
-  as_root tee "$KLM_GLOBAL_ENV" >/dev/null <<EOF
-KLM_HOME="$KLM_HOME"
-EOF
-
-  as_root chmod 0644 "$KLM_GLOBAL_ENV"
-}
-
-write_env_envfile() {
-  log "Writing environment KLM env file"
-
-  as_root tee "$KLM_ENV_DIR/klm.env" >/dev/null <<EOF
-KLM_ENV_NAME="$KLM_ENV_NAME"
-KLM_ENV_DIR="$KLM_ENV_DIR"
-KLM_BUNDLES_DIR="$KLM_BUNDLES_DIR"
-KLM_DEPLOYMENT_FILE="$KLM_DEPLOYMENT_FILE"
-EOF
-
-  as_root chmod 0644 "$KLM_ENV_DIR/klm.env"
-  as_root chown "$KLM_OWNER:$KLM_GROUP" "$KLM_ENV_DIR/klm.env"
+  log "Installed klm-core to: $target_dir"
 }
 
 run_core_init() {
   local init_sh
-  local init_py
 
-  init_sh="$KLM_BUNDLES_DIR/klm-core/automation/init.sh"
-  init_py="$KLM_BUNDLES_DIR/klm-core/automation/init.py"
-
-  export KLM_HOME
-  export KLM_ENV_NAME
-  export KLM_ENV_DIR
-  export KLM_BUNDLES_DIR
-  export KLM_DEPLOYMENT_FILE
+  init_sh="$KLM_BUNDLES_DIR/klm-core/actions/init/init.sh"
 
   if [[ -f "$init_sh" ]]; then
-    log "Running klm-core init.sh"
+    log "Handing off to klm-core init.sh"
 
     as_root chmod +x "$init_sh"
 
@@ -221,26 +197,17 @@ run_core_init() {
       KLM_ENV_DIR="$KLM_ENV_DIR" \
       KLM_BUNDLES_DIR="$KLM_BUNDLES_DIR" \
       KLM_DEPLOYMENT_FILE="$KLM_DEPLOYMENT_FILE" \
-      "$init_sh"
+      KLM_OWNER="$KLM_OWNER" \
+      KLM_GROUP="$KLM_GROUP" \
+      KLM_CORE_VERSION="$KLM_CORE_VERSION" \
+      "$init_sh" \
+        --config "$CONFIG_FILE" \
+        --bundles "${BUNDLES[@]}"
 
     return
   fi
 
-  if [[ -f "$init_py" ]]; then
-    log "Running klm-core init.py"
-
-    as_root env \
-      KLM_HOME="$KLM_HOME" \
-      KLM_ENV_NAME="$KLM_ENV_NAME" \
-      KLM_ENV_DIR="$KLM_ENV_DIR" \
-      KLM_BUNDLES_DIR="$KLM_BUNDLES_DIR" \
-      KLM_DEPLOYMENT_FILE="$KLM_DEPLOYMENT_FILE" \
-      python3 "$init_py"
-
-    return
-  fi
-
-  die "No klm-core init script found"
+  die "No klm-core init script found. Expected actions/init/init.sh or actions/init/init.py"
 }
 
 CONFIG_FILE=""
@@ -254,7 +221,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --bundles)
       shift
-
       while [[ $# -gt 0 && "$1" != --* ]]; do
         BUNDLES+=("$1")
         shift
@@ -272,15 +238,16 @@ done
 
 [[ -n "$CONFIG_FILE" ]] || die "Missing --config <deployment.yml>"
 [[ -f "$CONFIG_FILE" ]] || die "Deployment config not found: $CONFIG_FILE"
-
-[[ "${#BUNDLES[@]}" -gt 0 ]] || die "No bundles provided"
+[[ "${#BUNDLES[@]}" -gt 0 ]] || die "Missing --bundles <bundle...>"
 
 need_cmd python3
 need_cmd tar
 need_cmd find
+need_cmd mktemp
 need_cmd cp
 need_cmd rm
-need_cmd mktemp
+need_cmd wc
+need_cmd head
 
 KLM_ENV_NAME="$(yaml_get "$CONFIG_FILE" "all.vars.env_name")"
 KLM_HOME="$(yaml_get "$CONFIG_FILE" "all.vars.klm.home")"
@@ -300,53 +267,23 @@ KLM_ENV_DIR="$KLM_HOME/env/$KLM_ENV_NAME"
 KLM_BUNDLES_DIR="$KLM_ENV_DIR/bundles"
 KLM_DEPLOYMENT_FILE="$KLM_ENV_DIR/deployment.yml"
 
-log "Initializing KLM environment"
+log "Bootstrapping KLM environment"
 log "  Environment: $KLM_ENV_NAME"
 log "  KLM_HOME: $KLM_HOME"
 log "  Owner/Group: $KLM_OWNER:$KLM_GROUP"
 log "  Core Version: $KLM_CORE_VERSION"
 
-log "Creating directory structure"
+log "Creating minimal directory structure"
 
 as_root mkdir -p "$KLM_HOME"
 as_root mkdir -p "$KLM_HOME/bin"
 as_root mkdir -p "$KLM_ENV_DIR"
 as_root mkdir -p "$KLM_BUNDLES_DIR"
 
+CORE_BUNDLE="$(find_core_bundle)"
 
-log "Copying deployment.yml"
-
-as_root cp "$CONFIG_FILE" "$KLM_DEPLOYMENT_FILE"
-
-for bundle in "${BUNDLES[@]}"; do
-  install_bundle "$bundle"
-done
-
-validate_core_bundle
-
-write_global_env
-write_env_envfile
-
-log "Installing KLM profile"
-
-as_root tee /etc/profile.d/klm.sh >/dev/null <<EOF
-export PATH="\$PATH:$KLM_HOME/bin"
-EOF
-
-log "Installing lightweight KLM launcher"
-
-as_root install -m 0755 \
-  "$KLM_BUNDLES_DIR/klm-core/bin/klm-launcher.sh" \
-  "$KLM_HOME/bin/klm"
-
-as_root chmod 0644 /etc/profile.d/klm.sh
-
-log "Setting ownership"
-
-as_root chown -R "$KLM_OWNER:$KLM_GROUP" "$KLM_ENV_DIR"
+install_core_bundle "$CORE_BUNDLE"
 
 run_core_init
 
-log "KLM init complete"
-log "Run with:"
-log "  klm"
+log "Bootstrap complete"

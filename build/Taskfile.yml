@@ -5,9 +5,9 @@ tasks:
     desc: Build all bundles
     cmds:
       - bash ./build-bundle.sh ../bundles/klm-core
-      - bash ./build-bundle.sh ../bundles/onboarder
-      - bash ./build-bundle.sh ../bundles/basekit
-      - bash ./build-bundle.sh ../bundles/afcgi
+      #- bash ./build-bundle.sh ../bundles/onboarder
+      #- bash ./build-bundle.sh ../bundles/basekit
+      #- bash ./build-bundle.sh ../bundles/afcgi
 
   bundle:klm-core:
     desc: Build klm-core bundle
@@ -17,3 +17,21 @@ tasks:
   bundle:onboarder:
     cmds:
       - bash ./build-bundle.sh ../bundles/onboarder
+
+  test:
+    desc: Run all tests
+    cmds:
+      - task: clean
+      - task: bundle
+      - task: init
+
+  init:
+    desc: Run klm-core init.sh for testing
+    cmds:
+      - bash /opt/Kratos-Lifecycle-Manager/klm-init.sh --config /home/kratos/deployment.yml --bundles /opt/Kratos-Lifecycle-Manager/dist/*
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf /opt/Kratos-Lifecycle-Manager/dist/*
+      - rm -rf /opt/openspace
