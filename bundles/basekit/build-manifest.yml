@@ -1,0 +1,19 @@
+executables: []
+
+required_files:
+  - manifest.yml
+  - Taskfile.yml
+
+required_dirs:
+  - actions
+  - images
+
+include_files: []
+
+exclude:
+  - build-manifest.yml
+  - .git
+  - .gitignore
+  - "*.bundle"
+  - tmp
+  - logs

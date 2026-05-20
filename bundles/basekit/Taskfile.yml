@@ -1,6 +1,26 @@
 version: '3'
 
+vars:
+  ENV_DIR:
+    sh: realpath "{{.TASKFILE_DIR}}/../.."
+  DEPLOYMENT_FILE: "{{.ENV_DIR}}/deployment.yml"
+  ANSIBLE_CONFIG: "{{.ENV_DIR}}/ansible.cfg"
+
+includes:
+  klm:
+    taskfile: ../klm-core/Taskfile.yml
+    dir: ../klm-core
+  onboarder:
+    taskfile: ../onboarder/Taskfile.yml
+    dir: ../onboarder
+
 tasks:
+  debug:
+    cmds:
+      - echo {{.ENV_DIR}}
+      - echo {{.DEPLOYMENT_FILE}}
+      - echo {{.ANSIBLE_CONFIG}}
+      
   full-install:
     desc: Complete Basekit Reference Architecture Install
     cmds:
@@ -11,7 +31,7 @@ tasks:
   node-prep:
     desc: Prepare nodes
     cmds:
-      - task: klm:playbook
+      - task: klm:ansible-playbook
         vars:
           PLAYBOOK: node-prep.yml
           HOSTS: "{{.HOSTS}}"

@@ -1,25 +1,13 @@
-apiVersion: klm.kratos/v1
-kind: Bundle
-
-metadata:
-  name: basekit
-  displayName: Basekit
-  version: 0.1.0
-
+name: basekit
+version: 0.1.0
 type: infrastructure
 
-tasks:
-  - id: render
-    task: render
-    label: render
-    description: Render inventory and generated architecture files from deployment.yml.
+description: OpenSpace reference architecture designed for minimal footprint deployments
 
-  - id: apply
-    task: apply
-    label: apply
-    description: Build or configure the base architecture.
+path:
+  add: []
 
-  - id: verify
-    task: verify
-    label: verify
-    description: Verify base architecture prerequisites and outputs.
+requires:
+  commands:
+    - python3
+    - tar
