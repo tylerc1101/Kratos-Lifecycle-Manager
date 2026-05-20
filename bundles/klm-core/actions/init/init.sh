@@ -68,7 +68,7 @@ log "config file=$CONFIG_FILE"
 log "Running env prep"
 "$CORE_DIR/actions/env/install-profile.sh"
 "$CORE_DIR/actions/env/prep-env.sh" --config "$CONFIG_FILE"
-"$CORE_DIR/actions/env/setup-taskfile.sh"
+"$CORE_DIR/actions/env/write-taskfile.sh"
 
 # FOR KLM interface (In Dev)
 #"$CORE_DIR/actions/env/install-launcher.sh"
