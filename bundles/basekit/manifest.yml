@@ -4,6 +4,10 @@ type: infrastructure
 
 description: OpenSpace reference architecture designed for minimal footprint deployments
 
+taskfile:
+  include: Taskfile.yml
+  namespace: Basekit
+
 path:
   add: []
 

@@ -10,6 +10,7 @@ executables:
   - actions/env/write-env-file.sh
   - actions/env/write-global-env.sh
   - actions/bundles/install-bundles.sh
+  - actions/env/setup-taskfile.sh
 
 required_files:
   - manifest.yml

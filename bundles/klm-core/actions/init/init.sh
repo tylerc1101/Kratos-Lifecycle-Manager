@@ -64,15 +64,16 @@ log "Installing Ansible"
 command -v task >/dev/null 2>&1 || die "task not found after install"
 command -v ansible-playbook >/dev/null 2>&1 || die "ansible-playbook not found after install"
 
-log "Handing off to Task/Ansible"
-
 log "config file=$CONFIG_FILE"
 log "Running env prep"
 "$CORE_DIR/actions/env/install-profile.sh"
-"$CORE_DIR/actions/env/write-env-file.sh"
-"$CORE_DIR/actions/env/write-global-env.sh"
 "$CORE_DIR/actions/env/prep-env.sh" --config "$CONFIG_FILE"
-"$CORE_DIR/actions/env/install-launcher.sh"
+"$CORE_DIR/actions/env/setup-taskfile.sh"
+
+# FOR KLM interface (In Dev)
+#"$CORE_DIR/actions/env/install-launcher.sh"
+#"$CORE_DIR/actions/env/write-env-file.sh"
+#"$CORE_DIR/actions/env/write-global-env.sh"
 
 if [[ "${#BUNDLES[@]}" -gt 0 ]]; then
   export KLM_BUNDLE_ARGS="${BUNDLES[*]}"
@@ -84,6 +85,9 @@ else
   log "No non-core bundles requested"
   log "Skipping non-core bundle install"
 fi
+
+log "Writing environment Taskfile"
+"$CORE_DIR/actions/env/write-taskfile.sh"
 
 log "KLM core init complete"
 

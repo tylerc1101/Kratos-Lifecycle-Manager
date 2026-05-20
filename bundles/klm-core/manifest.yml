@@ -4,6 +4,10 @@ type: infrastructure
 
 description: KLM-Core provides the core components and automation for running the Kratos Lifecycle Manager (KLM)
 
+taskfile:
+  include: Taskfile.yml
+  namespace: Core
+
 path:
   add:
     - bin
