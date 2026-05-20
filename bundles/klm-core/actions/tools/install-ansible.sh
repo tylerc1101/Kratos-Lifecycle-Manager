@@ -34,9 +34,9 @@ fi
 log "Installing Ansible RPMs from $ANSIBLE_RPM_DIR"
 
 if command -v dnf >/dev/null 2>&1; then
-  as_root dnf install -y "${RPMS[@]}"
+  as_root dnf install -y "${RPMS[@]} --nogpgcheck"
 elif command -v yum >/dev/null 2>&1; then
-  as_root yum install -y "${RPMS[@]}"
+  as_root yum install -y "${RPMS[@]} --nogpgcheck"
 elif command -v rpm >/dev/null 2>&1; then
   as_root rpm -Uvh --replacepkgs "${RPMS[@]}"
 else

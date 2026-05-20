@@ -68,11 +68,11 @@ command -v ansible-playbook >/dev/null 2>&1 || die "ansible-playbook not found a
 
 log "Handing off to Task/Ansible"
 
-task \
-  --taskfile "$CORE_DIR/Taskfile.yml" \
-  --dir "$CORE_DIR" \
-  init:ansible \
-  CONFIG_FILE="$CONFIG_FILE" \
-  BUNDLES="${BUNDLES[*]}"
+log "Running env prep"
+"$CORE_DIR/actions/tools/install-profile.sh"
+"$CORE_DIR/actions/tools/write-env-file.sh"
+"$CORE_DIR/actions/tools/wrtie-global-env.sh"
+"$CORE_DIR/actions/tools/prep-env.sh"
+"$CORE_DIR/actions/tools/install-launcher.sh"
 
 log "KLM core init complete"

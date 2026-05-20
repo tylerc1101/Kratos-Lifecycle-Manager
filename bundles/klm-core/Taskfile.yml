@@ -1,6 +1,23 @@
 version: '3'
 
 tasks:
+  init:
+    desc: Run initialization for KLM core bundle
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/env/prep-env.yml
+
+  env:show:
+    desc: Show selected KLM environment
+    cmds:
+      - |
+          echo "KLM_HOME=$KLM_HOME"
+          echo "KLM_ENV_NAME=$KLM_ENV_NAME"
+          echo "KLM_ENV_DIR=$KLM_ENV_DIR"
+          echo "KLM_BUNDLES_DIR=$KLM_BUNDLES_DIR"
+          echo "KLM_DEPLOYMENT_FILE=$KLM_DEPLOYMENT_FILE"
+
   ansible-playbook:
     internal: true
     requires:
