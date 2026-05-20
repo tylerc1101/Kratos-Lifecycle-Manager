@@ -1,12 +1,9 @@
 version: '3'
 
 tasks:
-  init:
-    desc: Run initialization for KLM core bundle
+  list:
     cmds:
-      - task: ansible-playbook
-        vars:
-          PLAYBOOK: ./actions/env/prep-env.yml
+      - task --list
 
   env:show:
     desc: Show selected KLM environment

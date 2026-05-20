@@ -7,6 +7,15 @@ description: KLM-Core provides the core components and automation for running th
 taskfile:
   include: Taskfile.yml
   namespace: Core
+  flatten: true
+  vars:
+    global:
+      KLM_HOME: "$KLM_HOME"
+      KLM_ENV_NAME: "$KLM_ENV_NAME"
+      KLM_ENV_DIR: "$KLM_ENV_DIR"
+      KLM_BUNDLES_DIR: "$KLM_BUNDLES_DIR"
+      KLM_DEPLOYMENT_FILE: "$KLM_DEPLOYMENT_FILE"
+    include: {}
 
 path:
   add:
