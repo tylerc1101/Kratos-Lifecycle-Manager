@@ -140,7 +140,7 @@ main() {
 
   env_dir="$KLM_ENV_ROOT/$env_name"
   env_file="$env_dir/klm.env"
-  env_cli="$env_dir/bundles/klm-core/automation/cli/klm_cli.py"
+  env_cli="$env_dir/bundles/klm-core/cli/klm_cli.py"
 
   [[ -d "$env_dir" ]] || die "Environment not found: $env_dir"
 

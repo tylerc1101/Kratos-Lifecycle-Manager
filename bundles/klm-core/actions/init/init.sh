@@ -44,7 +44,6 @@ done
 : "${KLM_GROUP:?KLM_GROUP is required}"
 
 [[ -f "$CONFIG_FILE" ]] || die "Config not found: $CONFIG_FILE"
-[[ "${#BUNDLES[@]}" -gt 0 ]] || die "Missing --bundles"
 
 export KLM_HOME
 export KLM_ENV_NAME
@@ -54,7 +53,6 @@ export KLM_DEPLOYMENT_FILE
 export KLM_OWNER
 export KLM_GROUP
 export KLM_CORE_DIR="$CORE_DIR"
-export KLM_BUNDLE_ARGS="${BUNDLES[*]}"
 export PATH="$KLM_HOME/bin:$PATH"
 
 log "Installing Task"
@@ -76,8 +74,16 @@ log "Running env prep"
 "$CORE_DIR/actions/env/prep-env.sh" --config "$CONFIG_FILE"
 "$CORE_DIR/actions/env/install-launcher.sh"
 
-log "Installing requested bundles"
-"$CORE_DIR/actions/bundles/install-bundles.sh"
+if [[ "${#BUNDLES[@]}" -gt 0 ]]; then
+  export KLM_BUNDLE_ARGS="${BUNDLES[*]}"
+
+  log "Installing requested non-core bundles"
+  log "Non-core bundles: ${BUNDLES[*]}"
+  "$CORE_DIR/actions/bundles/install-bundles.sh"
+else
+  log "No non-core bundles requested"
+  log "Skipping non-core bundle install"
+fi
 
 log "KLM core init complete"
 

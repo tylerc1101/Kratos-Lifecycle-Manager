@@ -6,7 +6,7 @@ required_files:
 
 required_dirs:
   - actions
-  - images
+    #  - images
 
 include_files: []
 

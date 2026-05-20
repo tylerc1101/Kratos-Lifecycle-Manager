@@ -11,34 +11,28 @@ log() {
 }
 
 : "${KLM_ENV_DIR:?KLM_ENV_DIR is required}"
-: "${KLM_BUNDLES_DIR:?KLM_BUNDLES_DIR is required}"
 : "${KLM_OWNER:?KLM_OWNER is required}"
 : "${KLM_GROUP:?KLM_GROUP is required}"
-: "${KLM_BUNDLE_ARGS:?KLM_BUNDLE_ARGS is required}"
 
 INSTALL_ROOT="$KLM_ENV_DIR/bundles"
 
 mkdir -p "$INSTALL_ROOT"
 
+if [[ -z "${KLM_BUNDLE_ARGS:-}" ]]; then
+  log "No non-core bundles requested"
+  exit 0
+fi
+
+read -r -a BUNDLES <<< "$KLM_BUNDLE_ARGS"
+
+log "Bundles to install: ${BUNDLES[*]}"
+
 find_bundle() {
   local bundle="$1"
 
-  [[ -f "$bundle" ]] && {
-    echo "$bundle"
-    return 0
-  }
+  [[ -f "$bundle" ]] || die "Bundle not found: $bundle"
 
-  [[ -f "$KLM_BUNDLES_DIR/$bundle" ]] && {
-    echo "$KLM_BUNDLES_DIR/$bundle"
-    return 0
-  }
-
-  [[ -f "$KLM_BUNDLES_DIR/$bundle.bundle" ]] && {
-    echo "$KLM_BUNDLES_DIR/$bundle.bundle"
-    return 0
-  }
-
-  die "Bundle not found: $bundle"
+  echo "$bundle"
 }
 
 install_bundle() {
@@ -70,28 +64,8 @@ install_bundle() {
   log "Installed: $bundle_name"
 }
 
-NON_CORE_BUNDLES=()
-
 for bundle in "${BUNDLES[@]}"; do
-  case "$(basename "$bundle")" in
-    klm-core|klm-core-*|klm-core*.bundle|klm-core*.tgz|klm-core*.tar.gz)
-      log "Skipping already-installed core bundle: $bundle"
-      ;;
-    *)
-      NON_CORE_BUNDLES+=("$bundle")
-      ;;
-  esac
+  install_bundle "$bundle"
 done
-
-export KLM_BUNDLE_ARGS="${NON_CORE_BUNDLES[*]}"
-
-if [[ "${#NON_CORE_BUNDLES[@]}" -gt 0 ]]; then
-  log "Installing requested bundles"
-  "$CORE_DIR/actions/bundles/install-bundles.sh"
-else
-  log "No non-core bundles requested"
-fi
-
-chown -R "$KLM_OWNER:$KLM_GROUP" "$INSTALL_ROOT"
 
 log "Bundle install complete"

@@ -33,13 +33,6 @@ Usage:
 
 Example:
   ./klm-init.sh --config ./deployment.yml --bundles ./dist/*.bundle
-
-Required deployment.yml values:
-  all.vars.env_name
-  all.vars.klm.home
-  all.vars.klm.owner
-  all.vars.klm.group
-  all.vars.klm.core.version
 EOF
 }
 
@@ -186,32 +179,29 @@ run_core_init() {
 
   init_sh="$KLM_BUNDLES_DIR/klm-core/actions/init/init.sh"
 
-  if [[ -f "$init_sh" ]]; then
-    log "Handing off to klm-core init.sh"
+  [[ -f "$init_sh" ]] || die "No klm-core init script found: $init_sh"
 
-    as_root chmod +x "$init_sh"
+  log "Handing off to klm-core init.sh"
 
-    as_root env \
-      KLM_HOME="$KLM_HOME" \
-      KLM_ENV_NAME="$KLM_ENV_NAME" \
-      KLM_ENV_DIR="$KLM_ENV_DIR" \
-      KLM_BUNDLES_DIR="$KLM_BUNDLES_DIR" \
-      KLM_DEPLOYMENT_FILE="$KLM_DEPLOYMENT_FILE" \
-      KLM_OWNER="$KLM_OWNER" \
-      KLM_GROUP="$KLM_GROUP" \
-      KLM_CORE_VERSION="$KLM_CORE_VERSION" \
-      "$init_sh" \
-        --config "$CONFIG_FILE" \
-        --bundles "${BUNDLES[@]}"
+  as_root chmod +x "$init_sh"
 
-    return
-  fi
-
-  die "No klm-core init script found. Expected actions/init/init.sh or actions/init/init.py"
+  as_root env \
+    KLM_HOME="$KLM_HOME" \
+    KLM_ENV_NAME="$KLM_ENV_NAME" \
+    KLM_ENV_DIR="$KLM_ENV_DIR" \
+    KLM_BUNDLES_DIR="$KLM_BUNDLES_DIR" \
+    KLM_DEPLOYMENT_FILE="$KLM_DEPLOYMENT_FILE" \
+    KLM_OWNER="$KLM_OWNER" \
+    KLM_GROUP="$KLM_GROUP" \
+    KLM_CORE_VERSION="$KLM_CORE_VERSION" \
+    "$init_sh" \
+      --config "$CONFIG_FILE" \
+      --bundles "${NON_CORE_BUNDLES[@]}"
 }
 
 CONFIG_FILE=""
 BUNDLES=()
+NON_CORE_BUNDLES=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -248,6 +238,7 @@ need_cmd cp
 need_cmd rm
 need_cmd wc
 need_cmd head
+need_cmd readlink
 
 KLM_ENV_NAME="$(yaml_get "$CONFIG_FILE" "all.vars.env_name")"
 KLM_HOME="$(yaml_get "$CONFIG_FILE" "all.vars.klm.home")"
@@ -281,6 +272,20 @@ as_root mkdir -p "$KLM_ENV_DIR"
 as_root mkdir -p "$KLM_BUNDLES_DIR"
 
 CORE_BUNDLE="$(find_core_bundle)"
+CORE_BUNDLE_REAL="$(readlink -f "$CORE_BUNDLE")"
+
+for bundle in "${BUNDLES[@]}"; do
+  bundle_real="$(readlink -f "$bundle")"
+
+  if [[ "$bundle_real" == "$CORE_BUNDLE_REAL" ]]; then
+    log "Core bundle will not be passed to addon installer: $bundle"
+  else
+    NON_CORE_BUNDLES+=("$bundle_real")
+  fi
+done
+
+log "Requested bundles: ${BUNDLES[*]}"
+log "Non-core bundles: ${NON_CORE_BUNDLES[*]:-none}"
 
 install_core_bundle "$CORE_BUNDLE"
 

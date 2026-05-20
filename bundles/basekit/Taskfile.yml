@@ -13,6 +13,7 @@ includes:
   onboarder:
     taskfile: ../onboarder/Taskfile.yml
     dir: ../onboarder
+    optional: true
 
 tasks:
   debug:
@@ -24,9 +25,7 @@ tasks:
   full-install:
     desc: Complete Basekit Reference Architecture Install
     cmds:
-      - task:
-      - task:
-      - task:
+      - task: node-prep
 
   node-prep:
     desc: Prepare nodes

@@ -5,7 +5,7 @@ tasks:
     desc: Build all bundles
     cmds:
       - task: bundle:klm-core
-      #- bash ./build-bundle.sh ../bundles/onboarder
+      - task: bundle:basekit 
       #- bash ./build-bundle.sh ../bundles/basekit
       #- bash ./build-bundle.sh ../bundles/afcgi
 
@@ -13,6 +13,11 @@ tasks:
     desc: Build klm-core bundle
     cmds:
       - bash ./build-bundle.sh ../bundles/klm-core
+
+  bundle:basekit:
+    desc: Build basekit bundle
+    cmds:
+      - bash ./build-bundle.sh ../bundles/basekit
 
   bundle:onboarder:
     cmds:
