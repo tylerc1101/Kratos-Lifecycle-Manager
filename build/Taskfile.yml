@@ -4,7 +4,7 @@ tasks:
   bundle:
     desc: Build all bundles
     cmds:
-      - bundle:klm-core
+      - task: bundle:klm-core
       #- bash ./build-bundle.sh ../bundles/onboarder
       #- bash ./build-bundle.sh ../bundles/basekit
       #- bash ./build-bundle.sh ../bundles/afcgi
@@ -35,3 +35,6 @@ tasks:
     cmds:
       - rm -rf /opt/Kratos-Lifecycle-Manager/dist/*
       - rm -rf /opt/openspace
+      - rm -rf /etc/profile.d/klm.sh
+      - rm -rf /etc/klm/klm.env
+      - dnf erase ansible ansible-core python3-cffi python3-cryptography python3-packaging python3-ply python3-pycparser python3-pyparsing python3-resolvelib sshpass -y

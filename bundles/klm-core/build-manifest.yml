@@ -4,6 +4,12 @@ executables:
   - actions/init/init.sh
   - actions/tools/install-task.sh
   - actions/tools/install-ansible.sh
+  - actions/env/install-launcher.sh
+  - actions/env/install-profile.sh
+  - actions/env/prep-env.sh
+  - actions/env/write-env-file.sh
+  - actions/env/write-global-env.sh
+  - actions/bundles/install-bundles.sh
 
 required_files:
   - manifest.yml

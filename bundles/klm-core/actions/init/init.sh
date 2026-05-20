@@ -68,11 +68,23 @@ command -v ansible-playbook >/dev/null 2>&1 || die "ansible-playbook not found a
 
 log "Handing off to Task/Ansible"
 
+log "config file=$CONFIG_FILE"
 log "Running env prep"
-"$CORE_DIR/actions/tools/install-profile.sh"
-"$CORE_DIR/actions/tools/write-env-file.sh"
-"$CORE_DIR/actions/tools/wrtie-global-env.sh"
-"$CORE_DIR/actions/tools/prep-env.sh"
-"$CORE_DIR/actions/tools/install-launcher.sh"
+"$CORE_DIR/actions/env/install-profile.sh"
+"$CORE_DIR/actions/env/write-env-file.sh"
+"$CORE_DIR/actions/env/write-global-env.sh"
+"$CORE_DIR/actions/env/prep-env.sh" --config "$CONFIG_FILE"
+"$CORE_DIR/actions/env/install-launcher.sh"
+
+log "Installing requested bundles"
+"$CORE_DIR/actions/bundles/install-bundles.sh"
 
 log "KLM core init complete"
+
+log ""
+log ""
+log "!!!IMPORTANT!!!"
+log ""
+log "User must run command (as root):"
+log "  export PATH=\$PATH:$KLM_HOME/bin"
+log "Or user must exit session and log back in for PATH variable to update"
