@@ -43,3 +43,23 @@ tasks:
       - rm -rf /etc/profile.d/klm.sh
       - rm -rf /etc/klm/klm.env
       - dnf erase ansible ansible-core python3-cffi python3-cryptography python3-packaging python3-ply python3-pycparser python3-pyparsing python3-resolvelib sshpass -y
+
+  deploy:
+    desc: build and deploy basekit bundle
+    interactive: true
+    cmds:
+      - task: test
+      - scp /home/kratos/deployment.yml kratos@10.243.76.*:/home/kratos
+      - scp /opt/Kratos-Lifecycle-Manager/klm-init.sh kratos@10.243.76.*:/home/kratos
+      - ssh kratos@10.243.76.* "bash mkdir -p /home/kratos/bundles"
+      - scp /opt/Kratos-Lifecycle-Manager/dist/* kratos@10.243.76.*:/home/kratos
+      - ssh kratos@10.243.76.* "bash /home/kratos/klm-init.sh --config /home/kratos/deployment.yml --bundles /opt/Kratos-Lifecycle-Manager/dist/*"
+
+  clean:deployment:
+    desc: Clean deployment artifacts
+    cmds:
+      - ssh kratos@10.243.76.* "bash rm -rf /var/lib/libvirt"
+      - ssh kratos@10.243.76.* "bash rm -rf /opt/openspace"
+      - ssh kratos@10.243.76.* "bash rm -rf /home/kratos/deployment.yml"
+      - ssh kratos@10.243.76.* "bash rm -rf /home/kratos/klm-init.sh"
+      - ssh kratos@10.243.76.* "bash rm -rf /home/kratos/bundles/*"
