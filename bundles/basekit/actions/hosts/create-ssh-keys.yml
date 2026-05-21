@@ -1,0 +1,78 @@
+---
+- name: Generate deployment SSH keys
+  hosts: klm-host
+  gather_facts: false
+  become: true
+
+  vars:
+    ssh_key_dir: "{{ klm.home }}/{{ env_name }}/ssh_keys"
+
+  tasks:
+    - name: Find all ssh_key values from inventory hosts
+      ansible.builtin.set_fact:
+        deployment_ssh_keys: >-
+          {{
+            groups['all']
+            | map('extract', hostvars, 'ssh_key')
+            | select('defined')
+            | unique
+            | list
+          }}
+
+    - name: Create SSH key directory
+      ansible.builtin.file:
+        path: "{{ ssh_key_dir }}"
+        state: directory
+        owner: "{{ klm.owner | default('root') }}"
+        group: "{{ klm.group | default(klm.owner | default('root')) }}"
+        mode: "0700"
+      become: true
+
+    - name: Check whether SSH private keys already exist
+      ansible.builtin.stat:
+        path: "{{ ssh_key_dir }}/{{ item }}"
+      loop: "{{ deployment_ssh_keys }}"
+      loop_control:
+        label: "{{ item }}"
+      register: ssh_key_stat
+      become: true
+
+    - name: Generate missing SSH keys
+      ansible.builtin.command:
+        argv:
+          - ssh-keygen
+          - -t
+          - rsa
+          - -b
+          - "4096"
+          - -f
+          - "{{ ssh_key_dir }}/{{ item.item }}"
+          - -N
+          - ""
+      loop: "{{ ssh_key_stat.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: not item.stat.exists
+      become: true
+
+    - name: Set private key permissions
+      ansible.builtin.file:
+        path: "{{ ssh_key_dir }}/{{ item }}"
+        owner: "{{ klm.owner | default('root') }}"
+        group: "{{ klm.group | default(klm.owner | default('root')) }}"
+        mode: "0600"
+      loop: "{{ deployment_ssh_keys }}"
+      loop_control:
+        label: "{{ item }}"
+      become: true
+
+    - name: Set public key permissions
+      ansible.builtin.file:
+        path: "{{ ssh_key_dir }}/{{ item }}.pub"
+        owner: "{{ klm.owner | default('root') }}"
+        group: "{{ klm.group | default(klm.owner | default('root')) }}"
+        mode: "0644"
+      loop: "{{ deployment_ssh_keys }}"
+      loop_control:
+        label: "{{ item }}.pub"
+      become: true

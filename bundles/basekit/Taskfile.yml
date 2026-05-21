@@ -1,16 +1,25 @@
 version: '3'
 
+vars:
+  STATE_DIR: '{{.KLM_ENV_DIR}}/.state/basekit'
+  STATE_COMPLETED_DIR: '{{.STATE_DIR}}/completed'
+
 tasks:
   debug:
     cmds:
       - echo {{.ENV_DIR}}
       - echo {{.DEPLOYMENT_FILE}}
       - echo {{.ANSIBLE_CONFIG}}
-      
+      - echo {{.KLM_ENV_DIR}}
+      - echo {{.KLM_DEPLOYMENT_FILE}}
+      - echo {{.STATE_DIR}}
+
   full-install:
     desc: Complete Basekit Reference Architecture Install
     cmds:
+      - task: init
       - task: node-prep:mgmt-kvm
+      - task: node-prep:create-ssh-keys
       - task: opnsense:deploy
       - task: mcm-vm:deploy
       - task: osms-vm:deploy
@@ -21,86 +30,251 @@ tasks:
       - task: osms-cluster:deploy
       - task: osdc-cluster:deploy
 
+  init:
+    desc: Initialize Basekit environment on MGMT-KVM server
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/init"
+    cmds:
+      - task: state:init
+      - tar -xzf ./images/basekit*.tar.gz -C /
+      - task: state:mark
+        vars:
+          NAME: init
+
   node-prep:mgmt-kvm:
     desc: Prepare MGMT-KVM server
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.mgmt-kvm"
     cmds:
       - task: ansible-playbook
         vars:
-          PLAYBOOK: ./actions/hosts/mgmt-kvm.yml
+          PLAYBOOK: ./actions/hosts/bootstrap-mgmt-kvm.yml
+      - task: state:mark
+        vars:
+          NAME: node-prep.mgmt-kvm
+
+  node-prep:create-ssh-keys:
+    desc: Create SSH keys for deployment
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.create-ssh-keys"
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/create-ssh-keys.yml
+      - task: state:mark
+        vars:
+          NAME: node-prep.create-ssh-keys
 
   opnsense:deploy:
     desc: Deploy OPNSense firewall into libvirt
     cmds:
+      - task: opnsense:configure
+      - task: opnsense:copy-config
+      - task: opnsense:install
+
+  opnsense:configure:
+    desc: Configure OPNSense firewall settings
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/opnsense.configure"
+    cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/opnsense/configure-opnsense.yml
+      - task: state:mark
+        vars:
+          NAME: opnsense.configure
+
+  opnsense:copy-config:
+    desc: Copy OPNSense configuration
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/opnsense.copy-config"
+    cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/opnsense/copy-opnsense-config.yml
-      - bash ./action/opnsense/install_opnsense.sh
+      - task: state:mark
+        vars:
+          NAME: opnsense.copy-config
+
+  opnsense:install:
+    desc: Install OPNSense firewall
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/opnsense.install"
+    cmds:
+      - bash ./actions/opnsense/install_opnsense.sh
+      - task: state:mark
+        vars:
+          NAME: opnsense.install
 
   mcm-vm:deploy:
     desc: Deploy MCM VM into libvirt
     cmds:
+      - task: mcm-vm:create
+      - task: mcm-vm:configure-partitions
+
+  mcm-vm:create:
+    desc: Create MCM VM
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/mcm-vm.create"
+    cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/deploy-vms.yml
           LIMIT: mcm
+      - task: state:mark
+        vars:
+          NAME: mcm-vm.create
+
+  mcm-vm:configure-partitions:
+    desc: Configure MCM VM partitions
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/mcm-vm.configure-partitions"
+    cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/configure-vm-partitions.yml
           LIMIT: mcm
+      - task: state:mark
+        vars:
+          NAME: mcm-vm.configure-partitions
 
   osms-vm:deploy:
     desc: Deploy OSMS VM into libvirt
     cmds:
+      - task: osms-vm:create
+      - task: osms-vm:configure-partitions
+
+  osms-vm:create:
+    desc: Create OSMS VM
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/osms-vm.create"
+    cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/deploy-vms.yml
           LIMIT: osms
+      - task: state:mark
+        vars:
+          NAME: osms-vm.create
+
+  osms-vm:configure-partitions:
+    desc: Configure OSMS VM partitions
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/osms-vm.configure-partitions"
+    cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/configure-vm-partitions.yml
           LIMIT: osms
+      - task: state:mark
+        vars:
+          NAME: osms-vm.configure-partitions
 
   node-prep:mcm:
     desc: Node prep MCM VM
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.mcm"
     cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/hosts/node-prep.yml
           LIMIT: mcm
+      - task: state:mark
+        vars:
+          NAME: node-prep.mcm
 
   node-prep:osms:
     desc: Node prep OSMS VM
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.osms"
     cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/hosts/node-prep.yml
           LIMIT: osms
+      - task: state:mark
+        vars:
+          NAME: node-prep.osms
 
   node-prep:osdc:
     desc: Node prep OSDC server
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.osdc"
     cmds:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/hosts/node-prep.yml
           LIMIT: osdc
+      - task: state:mark
+        vars:
+          NAME: node-prep.osdc
 
   mcm-cluster:deploy:
     desc: Deploy MCM cluster using the Onboarder Bundle
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/mcm-cluster.deploy"
     cmds:
       - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:mcm
+      - task: state:mark
+        vars:
+          NAME: mcm-cluster.deploy
 
   osms-cluster:deploy:
     desc: Deploy OSMS cluster using the Onboarder Bundle
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/osms-cluster.deploy"
     cmds:
       - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:osms
+      - task: state:mark
+        vars:
+          NAME: osms-cluster.deploy
 
   osdc-cluster:deploy:
     desc: Deploy OSDC cluster using the Onboarder Bundle
+    status:
+      - test -f "{{.STATE_COMPLETED_DIR}}/osdc-cluster.deploy"
     cmds:
       - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:osdc
+      - task: state:mark
+        vars:
+          NAME: osdc-cluster.deploy
+
+  state:init:
+    internal: true
+    cmds:
+      - mkdir -p "{{.STATE_COMPLETED_DIR}}"
+
+  state:mark:
+    internal: true
+    requires:
+      vars: [NAME]
+    cmds:
+      - task: state:init
+      - |
+          cat > "{{.STATE_COMPLETED_DIR}}/{{.NAME}}" <<EOF
+          task: {{.NAME}}
+          completed_at: $(date -Is)
+          host: $(hostname -f 2>/dev/null || hostname)
+          EOF
+
+  state:list:
+    desc: Show completed Basekit state
+    cmds:
+      - |
+          echo "Completed Basekit steps:"
+          ls -1 "{{.STATE_COMPLETED_DIR}}" 2>/dev/null || echo "No completed state found."
+
+  state:clear:
+    desc: Clear all Basekit task state
+    cmds:
+      - rm -rf "{{.STATE_DIR}}"
+
+  state:reset-step:
+    desc: Reset a specific Basekit state step
+    requires:
+      vars: [NAME]
+    cmds:
+      - rm -f "{{.STATE_COMPLETED_DIR}}/{{.NAME}}"
 
   ansible-playbook:
     internal: true
