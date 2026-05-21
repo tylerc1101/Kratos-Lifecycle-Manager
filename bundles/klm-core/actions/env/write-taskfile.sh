@@ -158,13 +158,13 @@ if global_vars:
 output["includes"] = includes
 
 output["tasks"] = {
-    "tasks": {
+    "list": {
         "desc": "List described tasks",
         "cmds": [
             "task --list"
         ],
     },
-    "tasks:all": {
+    "list-all": {
         "desc": "List all tasks",
         "cmds": [
             "task --list-all"

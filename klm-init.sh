@@ -163,7 +163,7 @@ install_core_bundle() {
   [[ "$name" == "klm-core" ]] || die "Expected klm-core bundle, got: $name"
   [[ "$version" == "$KLM_CORE_VERSION" ]] || die "Expected klm-core $KLM_CORE_VERSION, got: $version"
 
-  target_dir="$KLM_BUNDLES_DIR/klm-core"
+  target_dir="$KLM_BUNDLES_DIR/$name"
 
   as_root rm -rf "$target_dir"
   as_root mkdir -p "$target_dir"

@@ -1,10 +1,6 @@
 version: '3'
 
 tasks:
-  list:
-    cmds:
-      - task --list
-
   env:show:
     desc: Show selected KLM environment
     cmds:

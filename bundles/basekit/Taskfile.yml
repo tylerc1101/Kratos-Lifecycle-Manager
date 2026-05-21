@@ -1,20 +1,5 @@
 version: '3'
 
-vars:
-  ENV_DIR:
-    sh: realpath "{{.TASKFILE_DIR}}/../.."
-  DEPLOYMENT_FILE: "{{.ENV_DIR}}/deployment.yml"
-  ANSIBLE_CONFIG: "{{.ENV_DIR}}/ansible.cfg"
-
-includes:
-  klm:
-    taskfile: ../klm-core/Taskfile.yml
-    dir: ../klm-core
-  onboarder:
-    taskfile: ../onboarder/Taskfile.yml
-    dir: ../onboarder
-    optional: true
-
 tasks:
   debug:
     cmds:
@@ -25,13 +10,110 @@ tasks:
   full-install:
     desc: Complete Basekit Reference Architecture Install
     cmds:
-      - task: node-prep
+      - task: node-prep:mgmt-kvm
+      - task: opnsense:deploy
+      - task: mcm-vm:deploy
+      - task: osms-vm:deploy
+      - task: node-prep:mcm
+      - task: node-prep:osms
+      - task: node-prep:osdc
+      - task: mcm-cluster:deploy
+      - task: osms-cluster:deploy
+      - task: osdc-cluster:deploy
 
-  node-prep:
-    desc: Prepare nodes
+  node-prep:mgmt-kvm:
+    desc: Prepare MGMT-KVM server
     cmds:
-      - task: klm:ansible-playbook
+      - task: ansible-playbook
         vars:
-          PLAYBOOK: node-prep.yml
-          HOSTS: "{{.HOSTS}}"
+          PLAYBOOK: ./actions/hosts/mgmt-kvm.yml
 
+  opnsense:deploy:
+    desc: Deploy OPNSense firewall into libvirt
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/opnsense/configure-opnsense.yml
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/opnsense/copy-opnsense-config.yml
+      - bash ./action/opnsense/install_opnsense.sh
+
+  mcm-vm:deploy:
+    desc: Deploy MCM VM into libvirt
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/libvirt/deploy-vms.yml
+          LIMIT: mcm
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/libvirt/configure-vm-partitions.yml
+          LIMIT: mcm
+
+  osms-vm:deploy:
+    desc: Deploy OSMS VM into libvirt
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/libvirt/deploy-vms.yml
+          LIMIT: osms
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/libvirt/configure-vm-partitions.yml
+          LIMIT: osms
+
+  node-prep:mcm:
+    desc: Node prep MCM VM
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/node-prep.yml
+          LIMIT: mcm
+
+  node-prep:osms:
+    desc: Node prep OSMS VM
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/node-prep.yml
+          LIMIT: osms
+
+  node-prep:osdc:
+    desc: Node prep OSDC server
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/node-prep.yml
+          LIMIT: osdc
+
+  mcm-cluster:deploy:
+    desc: Deploy MCM cluster using the Onboarder Bundle
+    cmds:
+      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:mcm
+
+  osms-cluster:deploy:
+    desc: Deploy OSMS cluster using the Onboarder Bundle
+    cmds:
+      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:osms
+
+  osdc-cluster:deploy:
+    desc: Deploy OSDC cluster using the Onboarder Bundle
+    cmds:
+      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:osdc
+
+  ansible-playbook:
+    internal: true
+    requires:
+      vars: [PLAYBOOK]
+    vars:
+      LIMIT: '{{.LIMIT | default ""}}'
+      EXTRA_VARS: '{{.EXTRA_VARS | default ""}}'
+    cmds:
+      - >
+        ANSIBLE_CONFIG={{.ANSIBLE_CONFIG}}
+        ansible-playbook
+        -i {{.KLM_DEPLOYMENT_FILE}}
+        {{.PLAYBOOK}}
+        {{if .LIMIT}} --limit "{{.LIMIT}}" {{end}}
+        {{if .EXTRA_VARS}} --extra-vars '{{.EXTRA_VARS}}' {{end}}

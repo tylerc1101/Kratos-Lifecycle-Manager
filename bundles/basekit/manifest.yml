@@ -6,12 +6,30 @@ description: OpenSpace reference architecture designed for minimal footprint dep
 
 taskfile:
   include: Taskfile.yml
-  namespace: Basekit
+  namespace: basekit
 
 path:
-  add: []
+  add: {}
+
+provides: {}
 
 requires:
   commands:
     - python3
     - tar
+
+  bundles:
+    - name: klm-core
+      required: true
+      reason: Base KLM runtime
+
+    - name: onboarder
+      required: false
+      reason: Basekit requires Onboarder to deploy Rancher/Harbor/GitOps
+
+  capabilities:
+    - kubernetes
+    - rancher
+    - harbor
+    - git
+    - argocd

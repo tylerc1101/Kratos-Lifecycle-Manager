@@ -1,0 +1,35 @@
+name: onboarder
+version: 3.8.0
+type: infrastructure
+
+description: Infrastructure automation for OpenSpace environment
+
+taskfile:
+  include: Taskfile.yml
+  namespace: onboarder
+
+path:
+  add: {}
+
+provides:
+  - kubernetes
+  - rancher
+  - harbor
+  - git
+  - argocd
+
+requires:
+  commands:
+    - python3
+    - tar
+
+  bundles:
+    - name: klm-core
+      required: true
+      reason: Base KLM runtime
+
+  capabilities: {}
+
+  os:
+    redhat:
+      version: 9.7
