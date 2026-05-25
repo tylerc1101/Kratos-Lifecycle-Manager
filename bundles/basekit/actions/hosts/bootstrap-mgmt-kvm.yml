@@ -47,6 +47,7 @@
             if item.value.default_route | default(false)
             else omit
           }}
+        method4: manual
         method6: disabled
         stp: false
         autoconnect: true
@@ -67,13 +68,33 @@
       loop_control:
         label: "{{ item.value.physical_interface }} -> {{ item.key }}"
 
+    - name: Bring bridge slave connections up
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - connection
+          - up
+          - "{{ item.value.physical_interface }}-to-{{ item.key }}"
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.value.physical_interface }}-to-{{ item.key }}"
+      register: bridge_slave_up
+      changed_when: "'successfully activated' in bridge_slave_up.stdout"
+      failed_when: bridge_slave_up.rc != 0
+
     - name: Bring bridge connections up
-      community.general.nmcli:
-        conn_name: "{{ item.key }}"
-        state: up
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - connection
+          - up
+          - "{{ item.key }}"
       loop: "{{ host_bridges }}"
       loop_control:
         label: "{{ item.key }}"
+      register: bridge_up
+      changed_when: "'successfully activated' in bridge_up.stdout"
+      failed_when: bridge_up.rc != 0
 
     - name: Create KLM repo file
       yum_repository:
@@ -90,12 +111,12 @@
         loop_var: repo_item
         label: "{{ repo_item.key }}"
       register: repo_result
-      
+
     - name: Refresh DNF metadata
       dnf:
         update_cache: true
       when: repo_result.changed
-      
+
     - name: Configure /etc/resolv.conf
       copy:
         dest: /etc/resolv.conf
@@ -111,8 +132,8 @@
 
     - name: Set system hostname from inventory
       hostname:
-        name: "{{ hostname }}.{{ domain_name }}" 
-        
+        name: "{{ hostname }}.{{ domain_name }}"
+
     - name: Install required packages
       yum:
         name:

@@ -202,7 +202,12 @@ done < <(yaml_list "$BUILD_MANIFEST" "exclude")
 log "Creating bundle artifact"
 log "  Output: $OUT_FILE"
 
-tar -czf "$OUT_FILE" \
+tar --sort=name \
+  --mtime='UTC 2026-05-21' \
+  --owner=0 \
+  --group=0 \
+  --numeric-owner \
+  -czf "$OUT_FILE" \
   -C "$BUNDLE_DIR" \
   "${TAR_EXCLUDES[@]}" \
   .
