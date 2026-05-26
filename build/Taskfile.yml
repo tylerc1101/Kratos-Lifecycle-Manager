@@ -9,6 +9,7 @@ tasks:
     cmds:
       - task: bundle:klm-core
       - task: bundle:basekit
+      - task: bundle:onboarder
       #- bash ./build-bundle.sh ../bundles/basekit
       #- bash ./build-bundle.sh ../bundles/afcgi
 
@@ -23,6 +24,7 @@ tasks:
       - bash ./build-bundle.sh ../bundles/basekit
 
   bundle:onboarder:
+    desc: Build onboarder bundle
     cmds:
       - bash ./build-bundle.sh ../bundles/onboarder
 
@@ -65,15 +67,15 @@ tasks:
       - 'ssh kratos@{{.BUILD_SERVER}} "mkdir -p /home/kratos/bundles"'
       - 'scp /opt/Kratos-Lifecycle-Manager/dist/* kratos@{{.BUILD_SERVER}}:/home/kratos/bundles'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo bash /home/kratos/klm-init.sh --config /home/kratos/deployment.yml --bundles /home/kratos/bundles/*"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:full-install"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:full-install"'
 
   clean:deployment:
     desc: Clean deployment artifacts
     cmds:
       #- 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /var/lib/libvirt"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:osms-vm:destroy"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:mcm-vm:destroy"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:opnsense:destroy"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:osms-vm:destroy"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:mcm-vm:destroy"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:opnsense:destroy"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /opt/openspace"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/deployment.yml"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/klm-init.sh"'

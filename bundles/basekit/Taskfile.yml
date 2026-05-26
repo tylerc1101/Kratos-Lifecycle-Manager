@@ -199,10 +199,10 @@ tasks:
     status:
       - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.mcm"
     cmds:
-      - task: ansible-playbook
+      - task: run-bundle
         vars:
-          PLAYBOOK: ./actions/hosts/node-prep.yml
-          LIMIT: local
+          BUNDLE: onboarder
+          TASK: node-prep:mcm
       - task: state:mark
         vars:
           NAME: node-prep.mcm
@@ -212,10 +212,10 @@ tasks:
     status:
       - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.osms"
     cmds:
-      - task: ansible-playbook
+      - task: run-bundle
         vars:
-          PLAYBOOK: ./actions/hosts/node-prep.yml
-          LIMIT: openspace-osms
+          BUNDLE: onboarder
+          TASK: node-prep:osms
       - task: state:mark
         vars:
           NAME: node-prep.osms
@@ -225,10 +225,10 @@ tasks:
     status:
       - test -f "{{.STATE_COMPLETED_DIR}}/node-prep.osdc"
     cmds:
-      - task: ansible-playbook
+      - task: run-bundle
         vars:
-          PLAYBOOK: ./actions/hosts/node-prep.yml
-          LIMIT: openspace-osdc
+          BUNDLE: onboarder
+          TASK: node-prep:osdc
       - task: state:mark
         vars:
           NAME: node-prep.osdc
@@ -315,3 +315,10 @@ tasks:
         {{.PLAYBOOK}}
         {{if .LIMIT}} --limit "{{.LIMIT}}" {{end}}
         {{if .EXTRA_VARS}} --extra-vars '{{.EXTRA_VARS}}' {{end}}
+
+  run-bundle:
+    internal: true
+    requires:
+      vars: [BUNDLE, TASK]
+    cmds:
+      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" "{{.BUNDLE}}:{{.TASK}}"
