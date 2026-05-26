@@ -1,5 +1,6 @@
 - name: Copy files to mgmt_kvm
-  hosts: "{{ target_hosts | default('mgmt_kvm') }}"
+  hosts: localhost
+  gather_facts: false
   vars:
     output_dir: "{{ klm.home }}/env/{{ env_name }}/tmp"
     output_file: "{{ output_dir }}/config.xml"
