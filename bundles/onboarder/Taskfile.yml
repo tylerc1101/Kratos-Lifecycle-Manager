@@ -1,11 +1,9 @@
 version: '3'
 
 vars:
-  CONTAINER_NAME: '{{default "klm-onboarder" .ONBOARDER_CONTAINER_NAME}}'
-  IMAGE_REF_FILE: '{{.KLM_STATE_DIR}}/onboarder-image-ref'
-  IMAGE_ARCHIVE:
-    sh: |
-      find "{{.KLM_BUNDLE_DIR}}/files" -maxdepth 1 -type f \( -name "*.tar" -o -name "*.tar.gz" -o -name "*.tgz" \) | sort | tail -n1
+  CONTAINER_NAME: '{{default "onboarder" .ONBOARDER_CONTAINER_NAME}}'
+  IMAGE_REF: 'docker.io/onboarder/onboarder-full:v3.8.0'
+  IMAGE_ARCHIVE: '{{.KLM_BUNDLES_DIR}}/onboarder/images/onboarder-full_v3.8.0.tar.gz'
   RUNTIME:
     sh: |
       if command -v podman >/dev/null 2>&1; then
@@ -35,69 +33,89 @@ tasks:
     desc: Load onboarder container image
     deps: [preflight]
     cmds:
-      - mkdir -p "{{.KLM_STATE_DIR}}"
-      - |
-          set -euo pipefail
-          output="$({{.RUNTIME}} load -i "{{.IMAGE_ARCHIVE}}" 2>&1 | tee /dev/stderr)"
-          image_ref="$(printf '%s\n' "$output" | sed -nE 's/^Loaded image: //p; s/^Loaded image\(s\): //p' | tail -n1 | xargs || true)"
-          if [ -z "$image_ref" ]; then
-            echo "Could not parse image ref from runtime load output."
-            exit 1
-          fi
-          echo "$image_ref" > "{{.IMAGE_REF_FILE}}"
-          echo "[onboarder] Loaded image: $image_ref"
+      - "export TMPDIR=/var && $({{.RUNTIME}} load -i {{.IMAGE_ARCHIVE}} 2>&1 | tee /dev/stderr)"
 
   run:
     desc: Start onboarder container
     deps: [load]
     cmds:
-      - |
-          set -euo pipefail
-          image_ref="$(cat "{{.IMAGE_REF_FILE}}")"
-
-          if {{.RUNTIME}} ps -a --format '{{"{{"}}.Names{{"}}"}}' | grep -qx "{{.CONTAINER_NAME}}"; then
-            {{.RUNTIME}} rm -f "{{.CONTAINER_NAME}}" >/dev/null
-          fi
-
-          {{.RUNTIME}} run -d \
-            --name "{{.CONTAINER_NAME}}" \
-            --hostname onboarder \
-            -v "{{.KLM_ENV_DIR}}:/openspace/env/current:Z" \
-            -v "{{.KLM_ARTIFACTS_DIR}}:/openspace/artifacts:Z" \
-            -v "{{.KLM_BUNDLES_DIR}}:/openspace/bundles:Z" \
-            -e "KLM_ENV_DIR=/openspace/env/current" \
-            -e "KLM_CONFIG=/openspace/env/current/deployment.yml" \
-            "$image_ref" \
-            /bin/bash -lc "sleep infinity"
-
-          echo "[onboarder] Container started: {{.CONTAINER_NAME}}"
-
-  apply:
-    desc: Run onboarder deployment
-    deps: [run]
-    cmds:
-      - |
-          {{.RUNTIME}} exec "{{.CONTAINER_NAME}}" \
-            bash -lc 'onboarder deploy --config /openspace/env/current/deployment.yml'
-
-  verify:
-    desc: Verify onboarder deployment
-    cmds:
-      - |
-          {{.RUNTIME}} exec "{{.CONTAINER_NAME}}" \
-            bash -lc 'onboarder verify --config /openspace/env/current/deployment.yml'
+      - '{{.RUNTIME}} run -it -d \
+          --name "{{.CONTAINER_NAME}}" \
+          --hostname onboarder-3.8.0 \
+          "{{.IMAGE_REF}}" \
+          /bin/bash
 
   shell:
     desc: Open onboarder shell
     interactive: true
     cmds:
-      - '{{.RUNTIME}} exec -it "{{.CONTAINER_NAME}}" bash'
+      - "{{.RUNTIME}} exec -it {{.CONTAINER_NAME}} bash"
 
   stop:
     desc: Stop onboarder container
     cmds:
-      - |
-          if {{.RUNTIME}} ps -a --format '{{"{{"}}.Names{{"}}"}}' | grep -qx "{{.CONTAINER_NAME}}"; then
-            {{.RUNTIME}} rm -f "{{.CONTAINER_NAME}}" >/dev/null
-          fi
-          echo "[onboarder] Container stopped/removed if it existed."
+      - "{{.RUNTIME}} stop {{.CONTAINER_NAME}} >/dev/null"
+
+  remove:
+    desc: Remove onboarder container
+    cmds:
+      - "{{.RUNTIME}} rm {{.CONTAINER_NAME}} >/dev/null"
+
+  prep:
+    desc: Prep onboarder container
+    deps: [run]
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/container/prep-container.yml
+  
+  node-prep:mcm:
+    desc: Run node preparation for MCM cluster
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/node-prep.yml
+          LIMIT: local
+
+  node-prep:osms:
+    desc: Run node preparation for OSMS cluster
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/node-prep.yml
+          LIMIT: openspace-osms
+
+  node-prep:osdc:
+    desc: Run node preparation for OSDC server
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/hosts/node-prep.yml
+          LIMIT: openspace-osdc
+
+  mcm:deploy:
+    desc: Deploy MCM cluster
+    cmds:
+      - task: make:rk2-cluster
+      - task: make:bootstrap-container-images
+      - task: make:helmfile-install
+      - task: make:load-darksite-bundles
+      - task: make:helmfile-install:rancher
+      - task: make:terraform-rancher
+      - task: make:install-gitea
+
+  ansible-playbook:
+    internal: true
+    requires:
+      vars: [PLAYBOOK]
+    vars:
+      LIMIT: '{{.LIMIT | default ""}}'
+      EXTRA_VARS: '{{.EXTRA_VARS | default ""}}'
+    cmds:
+      - >
+        ANSIBLE_CONFIG={{.ANSIBLE_CONFIG}}
+        ansible-playbook
+        -i {{.KLM_DEPLOYMENT_FILE}}
+        {{.PLAYBOOK}}
+        {{if .LIMIT}} --limit "{{.LIMIT}}" {{end}}
+        {{if .EXTRA_VARS}} --extra-vars '{{.EXTRA_VARS}}' {{end}}
