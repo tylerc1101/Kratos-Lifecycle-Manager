@@ -120,7 +120,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/deploy-vms.yml
-          LIMIT: mcm
+          LIMIT: local
       - task: state:mark
         vars:
           NAME: mcm-vm.create
@@ -133,7 +133,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/configure-vm-partitions.yml
-          LIMIT: mcm
+          LIMIT: local
       - task: state:mark
         vars:
           NAME: mcm-vm.configure-partitions
@@ -152,7 +152,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/deploy-vms.yml
-          LIMIT: osms
+          LIMIT: openspace-osms
       - task: state:mark
         vars:
           NAME: osms-vm.create
@@ -165,7 +165,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/libvirt/configure-vm-partitions.yml
-          LIMIT: osms
+          LIMIT: openspace-osms
       - task: state:mark
         vars:
           NAME: osms-vm.configure-partitions
@@ -178,7 +178,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/hosts/node-prep.yml
-          LIMIT: mcm
+          LIMIT: local
       - task: state:mark
         vars:
           NAME: node-prep.mcm
@@ -191,7 +191,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/hosts/node-prep.yml
-          LIMIT: osms
+          LIMIT: openspace-osms
       - task: state:mark
         vars:
           NAME: node-prep.osms
@@ -204,7 +204,7 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/hosts/node-prep.yml
-          LIMIT: osdc
+          LIMIT: openspace-osdc
       - task: state:mark
         vars:
           NAME: node-prep.osdc
