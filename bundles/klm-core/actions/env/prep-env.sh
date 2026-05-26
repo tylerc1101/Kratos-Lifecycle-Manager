@@ -54,4 +54,7 @@ as_root mkdir -p "$KLM_ENV_DIR/.kubeconfig"
 log "Copying deployment config"
 as_root cp "$CONFIG_FILE" "$KLM_DEPLOYMENT_FILE"
 
+log "Copying Ansible configuration template"
+as_root cp "./templates/ansible.cfg" "$KLM_ENV_DIR/ansible.cfg"
+
 as_root chown -R "$KLM_OWNER:$KLM_GROUP" "$KLM_ENV_DIR"

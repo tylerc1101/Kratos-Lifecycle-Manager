@@ -89,6 +89,9 @@ fi
 log "Writing environment Taskfile"
 "$CORE_DIR/actions/env/write-taskfile.sh"
 
+log "Setting permissions on KLM environment directory"
+as_root chown -R "$KLM_OWNER:$KLM_GROUP" "$KLM_HOME"
+
 log "KLM core init complete"
 
 log ""

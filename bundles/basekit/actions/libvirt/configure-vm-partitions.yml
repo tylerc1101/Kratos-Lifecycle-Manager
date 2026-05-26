@@ -1,8 +1,9 @@
 ---
 - name: Expand disk partition and logical volumes
-  hosts: "{{ target_hosts }}:!openspace_data_cluster"
+  hosts: all
   become: yes
   gather_facts: yes
+  become: true
   
   vars:
     disk_device: /dev/vda
