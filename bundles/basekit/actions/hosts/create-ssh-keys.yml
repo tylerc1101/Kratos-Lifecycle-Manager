@@ -5,7 +5,7 @@
   become: true
 
   vars:
-    ssh_key_dir: "{{ klm.home }}/{{ env_name }}/ssh_keys"
+    ssh_key_dir: "{{ klm.home }}/env/{{ env_name }}/.ssh"
 
   tasks:
     - name: Find all ssh_key values from inventory hosts

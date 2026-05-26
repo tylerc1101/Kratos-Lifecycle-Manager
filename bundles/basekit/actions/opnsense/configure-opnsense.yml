@@ -3,14 +3,18 @@
   hosts: localhost
   
   vars:
-    template_file: "{{ lookup('env', 'OLM_BASEKIT_TEMPLATES_DIR') }}/config_template.xml"
-    output_dir: "{{ lookup('env', 'OLM_GENERATED_FILES_DIR') }}"
+    template_file: "./templates/config_template.xml"
+    output_dir: "{{ klm.home }}/env/{{ env_name }}/tmp"
     output_file: "{{ output_dir }}/config.xml"
-    wan_ip: "{{ hostvars['opnsense'].ansible_host }}"
+    wan_ip: "{{ networks.firewall.opnsense.wan_ip }}"
     opnsense_hostname: "opnsense"
     wan_interface: "vtnet1"
     lan_interface: "vtnet0"
     opt1_interface: "vtnet2"
+    customer_gateway: "{{ networks.bridges.br-wan.gateway }}"
+    customer_cidr: "{{ networks.bridges.br-wan.gateway | regex_replace('^/', '')) }}"
+    ntp_server: "{{ networks.ntp.servers | join(',') }}"
+    domain_name: "{{ domain_name }}"
   
   tasks:
     
@@ -31,7 +35,7 @@
           {{ template_content.content | b64decode | 
              regex_replace('__WAN_IP__', wan_ip) |
              regex_replace('__WAN_GATEWAY__', customer_gateway) |
-             regex_replace('__WAN_SUBNET__', customer_cidr | regex_replace('^/', '')) |
+             regex_replace('__WAN_SUBNET__', customer_cidr) |
              regex_replace('__NTP_TIMESERVERS__', ntp_server) |
              regex_replace('__NTP_PREFER__', ntp_server) |
              regex_replace('__OPNSENSE_HOSTNAME__', opnsense_hostname) |

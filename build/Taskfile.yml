@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  BUILD_SERVER: "10.243.77.70"
+  BUILD_SERVER: "10.243.76.38"
 
 tasks:
   bundle:
