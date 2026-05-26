@@ -46,27 +46,27 @@ def resolve_value(value, bundle_context):
     """
     Resolves values from manifest.yml.
 
-    Supported examples:
-      "$KLM_HOME"          -> value of environment variable KLM_HOME
-      "$KLM_ENV_DIR"       -> value of environment variable KLM_ENV_DIR
-      "$BUNDLE_NAME"       -> bundle manifest name
-      "$BUNDLE_VERSION"    -> bundle manifest version
-      "$BUNDLE_DIR"        -> relative bundle directory path
-      "static-value"       -> static-value
+    Supports:
+      "$KLM_ENV_DIR"
+      "$KLM_ENV_DIR/ansible.cfg"
+      "${KLM_ENV_DIR}/ansible.cfg"
+      "$BUNDLE_DIR/file"
+      "${BUNDLE_DIR}/file"
     """
 
     if not isinstance(value, str):
         return value
 
-    if not value.startswith("$"):
-        return value
+    resolved = value
 
-    var_name = value[1:]
+    all_vars = dict(os.environ)
+    all_vars.update(bundle_context)
 
-    if var_name in bundle_context:
-        return bundle_context[var_name]
+    for key, val in all_vars.items():
+        resolved = resolved.replace(f"${key}", str(val))
+        resolved = resolved.replace(f"${{{key}}}", str(val))
 
-    return os.environ.get(var_name, "")
+    return resolved
 
 
 def merge_global_var(key, value, source):

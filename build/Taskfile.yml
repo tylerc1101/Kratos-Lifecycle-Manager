@@ -62,6 +62,8 @@ tasks:
     interactive: true
     cmds:
       #- task: test
+      - task: clean
+      - task: bundle
       - 'scp /home/kratos/deployment.yml kratos@{{.BUILD_SERVER}}:/home/kratos'
       - 'scp /opt/Kratos-Lifecycle-Manager/klm-init.sh kratos@{{.BUILD_SERVER}}:/home/kratos'
       - 'ssh kratos@{{.BUILD_SERVER}} "mkdir -p /home/kratos/bundles"'
@@ -73,6 +75,7 @@ tasks:
     desc: Clean deployment artifacts
     cmds:
       #- 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /var/lib/libvirt"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo truncate -s 0 /root/.ssh/known_hosts"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:osms-vm:destroy"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:mcm-vm:destroy"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:opnsense:destroy"'

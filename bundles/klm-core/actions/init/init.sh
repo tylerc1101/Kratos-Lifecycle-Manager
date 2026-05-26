@@ -13,6 +13,14 @@ log() {
   echo "[klm-core:init] $*" >&2
 }
 
+as_root() {
+  if [[ "${EUID}" -eq 0 ]]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 CONFIG_FILE=""
 BUNDLES=()
 
