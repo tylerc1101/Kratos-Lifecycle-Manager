@@ -1,36 +1,123 @@
 - name: Copy files to mgmt_kvm
   hosts: localhost
   gather_facts: false
+  become: true
+
   vars:
     output_dir: "{{ klm.home }}/env/{{ env_name }}/tmp"
     output_file: "{{ output_dir }}/config.xml"
-    images_dir: /var/lib/libvirt/config
+
+    libvirt_dir: /var/lib/libvirt
+    libvirt_images_dir: /var/lib/libvirt/images
+
+    config_dir: /var/lib/libvirt/config
+    config_images_dir: /var/lib/libvirt/config/images
     vm_config_dir: /var/lib/libvirt/config/vm_config
     opnsense_dir: /var/lib/libvirt/config/vm_config/opnsense
 
+    opnsense_iso: /var/lib/libvirt/config/images/OPNsense-24.7-dvd-amd64.iso
+    opnsense_config_iso: /var/lib/libvirt/config/vm_config/opnsense/opnsense_config.iso
+
+    qemu_user: qemu
+    qemu_group: qemu
+
   tasks:
-    - name: Ensure directories exist
-      file:
+    - name: Ensure libvirt/config directories exist
+      ansible.builtin.file:
         path: "{{ item }}"
         state: directory
-      loop: 
-        - "{{ images_dir }}"
+        mode: "0755"
+      loop:
+        - "{{ config_dir }}"
+        - "{{ config_images_dir }}"
+        - "{{ vm_config_dir }}"
+        - "{{ opnsense_dir }}"
+        - "{{ libvirt_images_dir }}"
+
+    - name: Ensure qemu can traverse libvirt parent directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /var
+        - /var/lib
+        - "{{ libvirt_dir }}"
+        - "{{ libvirt_images_dir }}"
+        - "{{ config_dir }}"
+        - "{{ config_images_dir }}"
         - "{{ vm_config_dir }}"
         - "{{ opnsense_dir }}"
 
-    - name: Copy generated config to mgmt_kvm
-      copy:
-        src: "{{ output_file }}"
-        dest: "/var/lib/libvirt/config/vm_config/opnsense/config.xml"
-        mode: '0644'
+    - name: Set qemu ownership on libvirt images directory
+      ansible.builtin.file:
+        path: "{{ libvirt_images_dir }}"
+        state: directory
+        owner: "{{ qemu_user }}"
+        group: "{{ qemu_group }}"
+        recurse: true
 
-    - name: Set SELinux file context for this nonstandard libvirt path
+    - name: Copy generated config to mgmt_kvm
+      ansible.builtin.copy:
+        src: "{{ output_file }}"
+        dest: "{{ opnsense_dir }}/config.xml"
+        owner: "{{ qemu_user }}"
+        group: "{{ qemu_group }}"
+        mode: "0644"
+
+    - name: Set qemu ownership on OPNsense config directory
+      ansible.builtin.file:
+        path: "{{ opnsense_dir }}"
+        state: directory
+        owner: "{{ qemu_user }}"
+        group: "{{ qemu_group }}"
+        mode: "0755"
+        recurse: true
+
+    - name: Check whether OPNsense installer ISO exists
+      ansible.builtin.stat:
+        path: "{{ opnsense_iso }}"
+      register: opnsense_iso_stat
+
+    - name: Set permissions on OPNsense installer ISO
+      ansible.builtin.file:
+        path: "{{ opnsense_iso }}"
+        owner: "{{ qemu_user }}"
+        group: "{{ qemu_group }}"
+        mode: "0644"
+      when: opnsense_iso_stat.stat.exists
+
+    - name: Check whether generated OPNsense config ISO exists
+      ansible.builtin.stat:
+        path: "{{ opnsense_config_iso }}"
+      register: opnsense_config_iso_stat
+
+    - name: Set permissions on generated OPNsense config ISO
+      ansible.builtin.file:
+        path: "{{ opnsense_config_iso }}"
+        owner: "{{ qemu_user }}"
+        group: "{{ qemu_group }}"
+        mode: "0644"
+      when: opnsense_config_iso_stat.stat.exists
+
+    - name: Remove old specific SELinux context for OPNsense path if present
       community.general.sefcontext:
         target: "{{ opnsense_dir }}(/.*)?"
         setype: svirt_image_t
+        state: absent
+
+    - name: Set SELinux file context for nonstandard libvirt config path
+      community.general.sefcontext:
+        target: "{{ config_dir }}(/.*)?"
+        setype: virt_image_t
         state: present
 
-    - name: Restore SELinux contexts
-      command: restorecon -Rv "{{ opnsense_dir }}"
-      register: rc_restore
-      changed_when: "'restorecon' in rc_restore.stdout | default('')"
+    - name: Restore SELinux contexts for libvirt directory
+      ansible.builtin.command: restorecon -Rv "{{ libvirt_dir }}"
+      register: restore_libvirt
+      changed_when: restore_libvirt.stdout is search("Relabeled|reset")
+
+    - name: Restore SELinux contexts for config directory
+      ansible.builtin.command: restorecon -Rv "{{ config_dir }}"
+      register: restore_config
+      changed_when: restore_config.stdout is search("Relabeled|reset")

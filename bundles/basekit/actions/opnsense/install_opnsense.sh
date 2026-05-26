@@ -10,6 +10,10 @@ fi
 echo "Generating Configuation ISO.."
 genisoimage -output "${BASE_DIR}/opnsense_config.iso" -volid opnsense-config -joliet -rock -graft-points "/conf/config.xml=${BASE_DIR}/config.xml"
 
+chown qemu:qemu "${BASE_DIR}/opnsense_config.iso"
+chmod 644 "${BASE_DIR}/opnsense_config.iso"
+restorecon -v "${BASE_DIR}/opnsense_config.iso"
+
 if [[ $? -ne 0 ]]; then
     echo "Failed to create ISO. Quiting."
     exit 1

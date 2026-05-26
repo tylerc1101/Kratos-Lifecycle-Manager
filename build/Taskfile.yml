@@ -65,6 +65,7 @@ tasks:
       - 'ssh kratos@{{.BUILD_SERVER}} "mkdir -p /home/kratos/bundles"'
       - 'scp /opt/Kratos-Lifecycle-Manager/dist/* kratos@{{.BUILD_SERVER}}:/home/kratos/bundles'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo bash /home/kratos/klm-init.sh --config /home/kratos/deployment.yml --bundles /home/kratos/bundles/*"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:full-install'
 
   clean:deployment:
     desc: Clean deployment artifacts
