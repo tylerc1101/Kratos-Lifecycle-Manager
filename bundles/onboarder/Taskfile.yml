@@ -23,9 +23,18 @@ tasks:
             exit 1
           }
       - |
-          test -n "{{.IMAGE_ARCHIVE}}" || {
-            echo "No onboarder image archive found in {{.KLM_BUNDLE_DIR}}/files"
-            echo "Copy your onboarder image tar into the onboarder bundle files/ directory before packaging."
+          test -f "{{.IMAGE_ARCHIVE}}" || {
+            echo "No onboarder image archive found: {{.IMAGE_ARCHIVE}}"
+            exit 1
+          }
+      - |
+          test -n "{{.ANSIBLE_CONFIG}}" || {
+            echo "ANSIBLE_CONFIG is required"
+            exit 1
+          }
+      - |
+          test -f "{{.KLM_DEPLOYMENT_FILE}}" || {
+            echo "Inventory not found: {{.KLM_DEPLOYMENT_FILE}}"
             exit 1
           }
 
@@ -33,17 +42,25 @@ tasks:
     desc: Load onboarder container image
     deps: [preflight]
     cmds:
-      - "export TMPDIR=/var && $({{.RUNTIME}} load -i {{.IMAGE_ARCHIVE}} 2>&1 | tee /dev/stderr)"
+      - |
+          export TMPDIR=/var/tmp
+          {{.RUNTIME}} load -i "{{.IMAGE_ARCHIVE}}"
 
   run:
     desc: Start onboarder container
     deps: [load]
     cmds:
-      - '{{.RUNTIME}} run -it -d \
-          --name "{{.CONTAINER_NAME}}" \
-          --hostname onboarder-3.8.0 \
-          "{{.IMAGE_REF}}" \
-          /bin/bash
+      - |
+          if {{.RUNTIME}} container exists "{{.CONTAINER_NAME}}" 2>/dev/null; then
+            echo "Container already exists: {{.CONTAINER_NAME}}"
+            exit 0
+          fi
+
+          {{.RUNTIME}} run -it -d \
+            --name "{{.CONTAINER_NAME}}" \
+            --hostname onboarder-3.8.0 \
+            "{{.IMAGE_REF}}" \
+            /bin/bash
 
   shell:
     desc: Open onboarder shell
@@ -54,12 +71,12 @@ tasks:
   stop:
     desc: Stop onboarder container
     cmds:
-      - "{{.RUNTIME}} stop {{.CONTAINER_NAME}} >/dev/null"
+      - "{{.RUNTIME}} stop {{.CONTAINER_NAME}} >/dev/null 2>&1 || true"
 
   remove:
     desc: Remove onboarder container
     cmds:
-      - "{{.RUNTIME}} rm {{.CONTAINER_NAME}} >/dev/null"
+      - "{{.RUNTIME}} rm -f {{.CONTAINER_NAME}} >/dev/null 2>&1 || true"
 
   prep:
     desc: Prep onboarder container
@@ -68,7 +85,8 @@ tasks:
       - task: ansible-playbook
         vars:
           PLAYBOOK: ./actions/container/prep-container.yml
-  
+          LIMIT: containers
+
   node-prep:mcm:
     desc: Run node preparation for MCM cluster
     cmds:
@@ -112,10 +130,10 @@ tasks:
       LIMIT: '{{.LIMIT | default ""}}'
       EXTRA_VARS: '{{.EXTRA_VARS | default ""}}'
     cmds:
-      - >
-        ANSIBLE_CONFIG={{.ANSIBLE_CONFIG}}
-        ansible-playbook
-        -i {{.KLM_DEPLOYMENT_FILE}}
-        {{.PLAYBOOK}}
-        {{if .LIMIT}} --limit "{{.LIMIT}}" {{end}}
-        {{if .EXTRA_VARS}} --extra-vars '{{.EXTRA_VARS}}' {{end}}
+      - |
+          ANSIBLE_CONFIG="{{.ANSIBLE_CONFIG}}" \
+          ansible-playbook \
+            -i "{{.KLM_DEPLOYMENT_FILE}}" \
+            "{{.PLAYBOOK}}" \
+            {{if .LIMIT}}--limit "{{.LIMIT}}"{{end}} \
+            {{if .EXTRA_VARS}}--extra-vars '{{.EXTRA_VARS}}'{{end}}

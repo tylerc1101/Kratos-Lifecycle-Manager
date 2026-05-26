@@ -321,4 +321,4 @@ tasks:
     requires:
       vars: [BUNDLE, TASK]
     cmds:
-      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" "{{.BUNDLE}}:{{.TASK}}"
+      - '{{.KLM_HOME}}/bin/task -t {{.KLM_ENV_DIR}}/Taskfile.yml {{.BUNDLE}}:{{.TASK}}'

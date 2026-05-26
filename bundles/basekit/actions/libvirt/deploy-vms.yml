@@ -139,7 +139,7 @@
         - vm_start.changed | default(false)
 
 
-- name: Verify requested OpenSpace VMs after boot
+- name: Prep Nodes
   hosts: all
   gather_facts: false
   connection: local
@@ -161,3 +161,48 @@
       retries: 20
       delay: 60
       changed_when: false
+
+    - name: Create KLM repo file
+      yum_repository:
+        name: "{{ repo_item.key }}"
+        description: "{{ repo_item.value.name }}"
+        baseurl: "{{ repo_item.value.baseurl }}"
+        enabled: "{{ repo_item.value.enabled | default(1) | bool }}"
+        gpgcheck: "{{ repo_item.value.gpgcheck | default(1) | bool }}"
+        failovermethod: "{{ repo_item.value.failovermethod | default(omit) }}"
+        file: "{{ repo.file }}"
+        state: present
+      loop: "{{ repo.entries | dict2items }}"
+      loop_control:
+        loop_var: repo_item
+        label: "{{ repo_item.key }}"
+      register: repo_result
+
+    - name: Refresh DNF metadata
+      dnf:
+        update_cache: true
+      when: repo_result.changed
+
+    - name: Configure /etc/resolv.conf
+      copy:
+        dest: /etc/resolv.conf
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+        content: |
+          # Managed by Ansible
+          {% for dns_server in networks.dns_servers %}
+          nameserver {{ dns_server }}
+          {% endfor %}
+
+    - name: Set system hostname from inventory
+      hostname:
+        name: "{{ hostname }}.{{ domain_name }}"
+
+    - name: Create sudoers entry for user
+      copy:
+        dest: /etc/sudoers.d/{{ ansible_user }}
+        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: '0440'
+        validate: 'visudo -cf %s'
