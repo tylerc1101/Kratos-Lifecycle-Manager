@@ -106,6 +106,12 @@ tasks:
         vars:
           NAME: opnsense.install
 
+  opnsense:destroy:
+    desc: Destroy OPNsense VM
+    cmds:
+      - sudo bash ./actions/opnsense/destroy_opnsense.sh
+      - rm -f "{{.STATE_COMPLETED_DIR}}/opnsense.install"
+
   mcm-vm:deploy:
     desc: Deploy MCM VM into libvirt
     cmds:
@@ -124,6 +130,15 @@ tasks:
       - task: state:mark
         vars:
           NAME: mcm-vm.create
+
+  mcm-vm:destroy:
+    desc: Destroy MCM VM
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/libvirt/destroy-vms.yml
+          LIMIT: local
+      - rm -f "{{.STATE_COMPLETED_DIR}}/mcm-vm.create"
 
   mcm-vm:configure-partitions:
     desc: Configure MCM VM partitions
@@ -156,6 +171,15 @@ tasks:
       - task: state:mark
         vars:
           NAME: osms-vm.create
+
+  osms-vm:destroy:
+    desc: Destroy OSMS VM
+    cmds:
+      - task: ansible-playbook
+        vars:
+          PLAYBOOK: ./actions/libvirt/destroy-vms.yml
+          LIMIT: openspace-osms
+      - rm -f "{{.STATE_COMPLETED_DIR}}/osms-vm.create"
 
   osms-vm:configure-partitions:
     desc: Configure OSMS VM partitions

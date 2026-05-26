@@ -1,6 +1,6 @@
 ---
 - name: Create requested OpenSpace VMs
-  hosts: local:openspace-osms
+  hosts: all
   gather_facts: false
   become: true
   connection: local
@@ -14,28 +14,16 @@
     mgmt_gateway: "{{ networks.bridges['br-mgmt'].gateway }}"
     mgmt_dns_servers: "{{ networks.dns_servers }}"
 
-    vm_role: "{{ 'mcm' if 'mcm' in group_names else 'osms' }}"
+    vm_role: "{{ cluster_type }}"
 
-    vm_name: "{{ vm_mcm_name if vm_role == 'mcm' else vm_osms_name }}"
-    vm_memory: "{{ vm_mcm_memory if vm_role == 'mcm' else vm_osms_memory }}"
-    vm_vcpus: "{{ vm_mcm_vcpus if vm_role == 'mcm' else vm_osms_vcpus }}"
-    vm_disk_size: "{{ vm_mcm_disk_size if vm_role == 'mcm' else vm_osms_disk_size }}"
-    vm_os_variant: "{{ vm_mcm_os_variant if vm_role == 'mcm' else vm_osms_os_variant }}"
-    vm_network_bridge: "{{ vm_mcm_network_bridge if vm_role == 'mcm' else vm_osms_network_bridge }}"
-
-    vm_backing_store: >-
-      {{
-        vm_mcm_backing_store
-        if vm_role == 'mcm'
-        else vm_osms_backing_store | default(images_dir ~ '/9_5_hardened_image_vm.qcow2')
-      }}
-
-    vm_mgmt_ip: >-
-      {{
-        mcm_nodes[0].mgmt_ip
-        if vm_role == 'mcm'
-        else osms_nodes[0].mgmt_ip
-      }}
+    vm_name: "{{ inventory_hostname }}"
+    vm_memory: "{{ libvirt.memory_mb }}"
+    vm_vcpus: "{{ libvirt.vcpus }}"
+    vm_disk_size: "{{ libvirt.disk_gb }}"
+    vm_backing_store: "{{ libvirt.backing_store | default(images_dir ~ '/9_5_hardened_image_vm.qcow2') }}"
+    vm_os_variant: "{{ libvirt.os_variant }}"
+    vm_network_bridge: "{{ libvirt.network_bridge }}"
+    vm_mgmt_ip: "{{ ansible_host }}"
 
     vm_ifcfg_dir: "/tmp/{{ vm_name }}-network"
     vm_ifcfg_file: "{{ vm_ifcfg_dir }}/ifcfg-enp1s0"
@@ -152,8 +140,10 @@
 
 
 - name: Verify requested OpenSpace VMs after boot
-  hosts: mcm:osms
+  hosts: all
   gather_facts: false
+  connection: local
+  serial: 1
 
   tasks:
     - name: Verify SSH connectivity

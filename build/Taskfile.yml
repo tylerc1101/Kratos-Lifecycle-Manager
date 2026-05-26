@@ -71,6 +71,9 @@ tasks:
     desc: Clean deployment artifacts
     cmds:
       #- 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /var/lib/libvirt"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:osms-vm:destroy"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:mcm-vm:destroy"'
+      - 'ssh kratos@{{.BUILD_SERVER}} "sudo task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:opnsense:destroy"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /opt/openspace"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/deployment.yml"'
       - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/klm-init.sh"'

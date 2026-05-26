@@ -1,0 +1,42 @@
+---
+- name: Destroy selected libvirt VMs
+  hosts: all
+  gather_facts: false
+  become: true
+  connection: local
+  serial: 1
+
+  vars:
+    vm_name: "{{ inventory_hostname }}"
+
+  tasks:
+    - name: Check if VM exists
+      ansible.builtin.command: virsh --connect qemu:///system dominfo "{{ vm_name }}"
+      register: vm_info
+      changed_when: false
+      failed_when: false
+
+    - name: Destroy running VM
+      ansible.builtin.command: virsh --connect qemu:///system destroy "{{ vm_name }}"
+      when:
+        - vm_info.rc == 0
+        - "'running' in vm_info.stdout"
+      register: destroy_result
+      changed_when: destroy_result.rc == 0
+
+    - name: Undefine VM and remove storage
+      ansible.builtin.command: virsh --connect qemu:///system undefine "{{ vm_name }}" --remove-all-storage --nvram
+      when: vm_info.rc == 0
+      register: undefine_result
+      changed_when: undefine_result.rc == 0
+      failed_when: false
+
+    - name: Remove leftover disk if present
+      ansible.builtin.file:
+        path: "/var/lib/libvirt/images/{{ vm_name }}.qcow2"
+        state: absent
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: >-
+          VM {{ vm_name }} was {{ 'destroyed/undefined' if vm_info.rc == 0 else 'not present' }}.

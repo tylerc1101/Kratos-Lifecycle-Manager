@@ -1,4 +1,6 @@
-executables: []
+executables:
+  - actions/opnsense/install_opnsense.sh
+  - actions/opnsense/destroy_opnsense.sh
 
 required_files:
   - manifest.yml
