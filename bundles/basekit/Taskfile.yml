@@ -238,7 +238,7 @@ tasks:
     status:
       - test -f "{{.STATE_COMPLETED_DIR}}/mcm-cluster.deploy"
     cmds:
-      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:deploy:mcm
+      - task -t "{{.KLM_ENV_DIR}}/Taskfile.yml" onboarder:mcm:deploy
       - task: state:mark
         vars:
           NAME: mcm-cluster.deploy

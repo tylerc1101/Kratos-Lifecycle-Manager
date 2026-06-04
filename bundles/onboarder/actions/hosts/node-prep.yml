@@ -5,17 +5,15 @@
   gather_facts: true
 
   vars:
+    bundles_dir: "{{ klm.home }}/env/{{ env_name }}/bundles/onboarder"
+    
     selinux_mode: enforcing
 
     kubectl_version: "1.34.1"
+    kubectl: "kubectl-{{ kubectl_version }}"
     kubectl_install_path: /usr/local/bin/kubectl
-    kubectl_arch_map:
-      x86_64: amd64
-      aarch64: arm64
-      arm64: arm64
-    kubectl_arch: "{{ kubectl_arch_map[ansible_architecture] | default(ansible_architecture) }}"
 
-    rke2_selinux_package_pattern: "rke2-selinux-0.22*"
+    rke2_selinux_package: "rke2-selinux-0.22-1.el9.noarch.rpm"
 
     tuned_profile: latency-performance
     osdc_kernel_args: "intel_idle.max_cstate=0 processor.max_cstate=1"
@@ -72,7 +70,6 @@
     kube_vip_modules:
       - ip_vs
       - ip_vs_rr
-      - wireguard
 
     sysctl_substrate_settings:
       fs.inotify.max_user_instances: "12288"
@@ -99,10 +96,19 @@
         state: present
         update_cache: true
 
+    - name: Copy rke2-selinux package to host
+      ansible.builtin.copy:
+        src: "{{ bundles_dir }}/images/{{ rke2_selinux_package }}"
+        dest: "/tmp/{{ rke2_selinux_package }}"
+        owner: root
+        group: root
+        mode: "0644"
+
     - name: Install pinned rke2-selinux package
       ansible.builtin.dnf:
-        name: "{{ rke2_selinux_package_pattern }}"
+        name: /tmp/rke2-selinux-0.22-1.el9.noarch.rpm
         state: present
+        disable_gpg_check: true
 
     - name: Configure SELinux mode persistently
       ansible.builtin.lineinfile:
@@ -123,13 +129,6 @@
         - selinux_enabled.rc == 0
       changed_when: true
 
-    - name: Set SELinux permissive immediately
-      ansible.builtin.command: setenforce 0
-      when:
-        - selinux_mode == "permissive"
-        - selinux_enabled.rc == 0
-      changed_when: true
-
     - name: Gather service facts
       ansible.builtin.service_facts:
 
@@ -139,7 +138,10 @@
         state: stopped
         enabled: false
       loop: "{{ firewall_services }}"
-      when: item ~ '.service' in ansible_facts.services
+      register: firewall_disable_result
+      failed_when: >
+        firewall_disable_result is failed
+        and 'Could not find the requested service' not in firewall_disable_result.msg
 
     - name: Enable and start chronyd
       ansible.builtin.systemd:
@@ -154,9 +156,9 @@
       changed_when: false
       failed_when: false
 
-    - name: Install kubectl {{ kubectl_version }}
-      ansible.builtin.get_url:
-        url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/{{ kubectl_arch }}/kubectl"
+    - name: Install kubectl "{{ kubectl_version }}"
+      ansible.builtin.copy:
+        src: "{{ bundles_dir }}/images/{{ kubectl }}"
         dest: "{{ kubectl_install_path }}"
         owner: root
         group: root
@@ -224,7 +226,6 @@
         content: |
           ip_vs
           ip_vs_rr
-          wireguard
 
     - name: Create RKE2 config directory
       ansible.builtin.file:

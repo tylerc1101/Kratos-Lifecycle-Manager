@@ -142,7 +142,6 @@
 - name: Prep Nodes
   hosts: all
   gather_facts: false
-  connection: local
   serial: 1
 
   tasks:

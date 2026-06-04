@@ -13,7 +13,7 @@
     lan_interface: "vtnet0"
     opt1_interface: "vtnet2"
     customer_gateway: "{{ networks.bridges['br-wan'].gateway }}"
-    customer_cidr: "{{ networks.bridges['br-wan'].gateway | regex_replace('^/', '') }}"
+    customer_cidr: "{{ networks.bridges['br-wan'].cidr.split('/')[1] }}"
     ntp_server: "{{ networks.ntp.servers | join(',') }}"
     customer_domain_name: "{{ domain_name }}"
 

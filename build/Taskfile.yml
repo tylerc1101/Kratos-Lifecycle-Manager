@@ -2,16 +2,46 @@ version: '3'
 
 vars:
   BUILD_SERVER: "10.243.76.38"
+  SSH_USER: "kratos"
+  REMOTE: "{{.SSH_USER}}@{{.BUILD_SERVER}}"
+
+  KLM_DIR: "/opt/Kratos-Lifecycle-Manager"
+  DIST_DIR: "{{.KLM_DIR}}/dist"
+  LOCAL_DEPLOYMENT_FILE: "/home/kratos/deployment.yml"
+  LOCAL_INIT_SCRIPT: "{{.KLM_DIR}}/klm-init.sh"
+
+  REMOTE_HOME: "/home/kratos"
+  REMOTE_STAGE_DIR: "/home/kratos/klm-stage"
+  REMOTE_BUNDLE_DIR: "{{.REMOTE_STAGE_DIR}}/bundles"
+  REMOTE_DEPLOYMENT_FILE: "{{.REMOTE_STAGE_DIR}}/deployment.yml"
+  REMOTE_INIT_SCRIPT: "{{.REMOTE_STAGE_DIR}}/klm-init.sh"
+
+  ENV_NAME: "Lab"
+  OPENSPACE_TASK: "/opt/openspace/bin/task"
+  ENV_TASKFILE: "/opt/openspace/env/{{.ENV_NAME}}/Taskfile.yml"
 
 tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  preflight:
+    desc: Validate local files and remote access
+    cmds:
+      - test -f {{.LOCAL_DEPLOYMENT_FILE}} || { echo "Missing {{.LOCAL_DEPLOYMENT_FILE}}"; exit 1; }
+      - test -f {{.LOCAL_INIT_SCRIPT}} || { echo "Missing {{.LOCAL_INIT_SCRIPT}}"; exit 1; }
+      - test -d {{.DIST_DIR}} || sudo mkdir -p {{.DIST_DIR}}
+      - ssh -o BatchMode=yes -o ConnectTimeout=5 {{.REMOTE}} "echo Remote access OK"
+
   bundle:
     desc: Build all bundles
     cmds:
+      - task: clean:bundles
       - task: bundle:klm-core
       - task: bundle:basekit
       - task: bundle:onboarder
-      #- bash ./build-bundle.sh ../bundles/basekit
-      #- bash ./build-bundle.sh ../bundles/afcgi
+      - task: bundle:verify
 
   bundle:klm-core:
     desc: Build klm-core bundle
@@ -28,58 +58,99 @@ tasks:
     cmds:
       - bash ./build-bundle.sh ../bundles/onboarder
 
+  bundle:verify:
+    desc: Verify bundle artifacts exist
+    cmds:
+      - test "$(find {{.DIST_DIR}} -maxdepth 1 -type f | wc -l)" -gt 0 || { echo "No bundles found in {{.DIST_DIR}}"; exit 1; }
+      - ls -lh {{.DIST_DIR}}
+
+  init:
+    desc: Run local klm-init.sh for testing
+    cmds:
+      - sudo bash {{.LOCAL_INIT_SCRIPT}} --config {{.LOCAL_DEPLOYMENT_FILE}} --bundles {{.DIST_DIR}}/*
+
   test:
-    desc: Run all tests
+    desc: Clean, build bundles, and run local init test
     cmds:
       - task: clean
       - task: bundle
       - task: init
 
-  init:
-    desc: Run klm-core init.sh for testing
+  clean:
+    desc: Clean local runtime artifacts
     cmds:
-      - bash /opt/Kratos-Lifecycle-Manager/klm-init.sh --config /home/kratos/deployment.yml --bundles /opt/Kratos-Lifecycle-Manager/dist/*
+      - sudo rm -rf -- /opt/openspace
+      - sudo rm -f -- /etc/profile.d/klm.sh
+      - sudo rm -f -- /etc/klm/klm.env
+
+  clean:bundles:
+    desc: Clean local bundle build artifacts
+    cmds:
+      - sudo mkdir -p {{.DIST_DIR}}
+      - sudo rm -rf -- {{.DIST_DIR}}/*
 
   clean:full:
-    desc: Clean build artifacts
-    cmds:
-      - rm -rf /opt/Kratos-Lifecycle-Manager/dist/*
-      - rm -rf /opt/openspace
-      - rm -rf /etc/profile.d/klm.sh
-      - rm -rf /etc/klm/klm.env
-      - dnf erase ansible ansible-core python3-cffi python3-cryptography python3-packaging python3-ply python3-pycparser python3-pyparsing python3-resolvelib sshpass -y
-
-  clean:
-    desc: Clean minor artifacts
-    cmds:
-      - rm -rf /opt/Kratos-Lifecycle-Manager/dist/*
-      - rm -rf /opt/openspace
-      - rm -rf /etc/profile.d/klm.sh
-      - rm -rf /etc/klm/klm.env
-
-  deploy:
-    desc: build and deploy basekit bundle
+    desc: Clean local runtime, bundle artifacts, and installed packages
     interactive: true
     cmds:
-      #- task: test
+      - test "{{.CONFIRM}}" = "yes" || { echo "Re-run with CONFIRM=yes"; exit 1; }
+      - task: clean:bundles
       - task: clean
+      - sudo dnf erase ansible ansible-core python3-cffi python3-cryptography python3-packaging python3-ply python3-pycparser python3-pyparsing python3-resolvelib sshpass -y
+
+  deploy:init-only:
+    desc: Build, copy, and run klm-init only
+    interactive: true
+    cmds:
+      - task: preflight
       - task: bundle
-      - 'scp /home/kratos/deployment.yml kratos@{{.BUILD_SERVER}}:/home/kratos'
-      - 'scp /opt/Kratos-Lifecycle-Manager/klm-init.sh kratos@{{.BUILD_SERVER}}:/home/kratos'
-      - 'ssh kratos@{{.BUILD_SERVER}} "mkdir -p /home/kratos/bundles"'
-      - 'scp /opt/Kratos-Lifecycle-Manager/dist/* kratos@{{.BUILD_SERVER}}:/home/kratos/bundles'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo bash /home/kratos/klm-init.sh --config /home/kratos/deployment.yml --bundles /home/kratos/bundles/*"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:full-install"'
+      - task: deploy:copy
+      - task: deploy:run:klm-init
+
+  deploy:full:
+    desc: Build, copy, run klm-init, then run basekit full install
+    interactive: true
+    cmds:
+      - task: deploy:init-only
+      - task: deploy:run:basekit:full-install
+
+  deploy:copy:
+    desc: Stage deployment files and bundles on build server
+    interactive: true
+    cmds:
+      - ssh {{.REMOTE}} "rm -rf {{.REMOTE_STAGE_DIR}} && mkdir -p {{.REMOTE_BUNDLE_DIR}}"
+      - scp {{.LOCAL_DEPLOYMENT_FILE}} {{.REMOTE}}:{{.REMOTE_DEPLOYMENT_FILE}}
+      - scp {{.LOCAL_INIT_SCRIPT}} {{.REMOTE}}:{{.REMOTE_INIT_SCRIPT}}
+      - scp {{.DIST_DIR}}/* {{.REMOTE}}:{{.REMOTE_BUNDLE_DIR}}/
+
+  deploy:run:klm-init:
+    desc: Run klm-init on build server
+    interactive: true
+    cmds:
+      - ssh {{.REMOTE}} "sudo bash {{.REMOTE_INIT_SCRIPT}} --config {{.REMOTE_DEPLOYMENT_FILE}} --bundles {{.REMOTE_BUNDLE_DIR}}/*"
+
+  deploy:run:basekit:full-install:
+    desc: Run basekit full install task on build server
+    interactive: true
+    cmds:
+      - ssh {{.REMOTE}} "sudo {{.OPENSPACE_TASK}} -t {{.ENV_TASKFILE}} basekit:full-install"
+
+  remote:task:
+    desc: Run an arbitrary OpenSpace task on the remote server
+    interactive: true
+    requires:
+      vars: [TASK]
+    cmds:
+      - ssh {{.REMOTE}} "sudo {{.OPENSPACE_TASK}} -t {{.ENV_TASKFILE}} {{.TASK}}"
 
   clean:deployment:
-    desc: Clean deployment artifacts
+    desc: Clean remote deployment artifacts
+    interactive: true
     cmds:
-      #- 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /var/lib/libvirt"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo truncate -s 0 /root/.ssh/known_hosts"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:osms-vm:destroy"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:mcm-vm:destroy"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo /opt/openspace/bin/task -t /opt/openspace/env/GEP1/Taskfile.yml basekit:opnsense:destroy"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /opt/openspace"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/deployment.yml"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/klm-init.sh"'
-      - 'ssh kratos@{{.BUILD_SERVER}} "sudo rm -rf /home/kratos/bundles/*"'
+      - test "{{.CONFIRM}}" = "yes" || { echo "Re-run with CONFIRM=yes"; exit 1; }
+      - ssh {{.REMOTE}} "sudo truncate -s 0 /root/.ssh/known_hosts || true"
+      - task: remote:task TASK=basekit:osms-vm:destroy || true
+      - task: remote:task TASK=basekit:mcm-vm:destroy || true
+      - task: remote:task TASK=basekit:opnsense:destroy || true
+      - ssh {{.REMOTE}} "sudo rm -rf -- /opt/openspace"
+      - ssh {{.REMOTE}} "sudo rm -rf -- {{.REMOTE_STAGE_DIR}}"
