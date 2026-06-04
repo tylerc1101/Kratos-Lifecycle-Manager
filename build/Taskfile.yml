@@ -10,15 +10,19 @@ vars:
   LOCAL_DEPLOYMENT_FILE: "/home/kratos/deployment.yml"
   LOCAL_INIT_SCRIPT: "{{.KLM_DIR}}/klm-init.sh"
 
-  REMOTE_HOME: "/home/kratos"
   REMOTE_STAGE_DIR: "/home/kratos/klm-stage"
   REMOTE_BUNDLE_DIR: "{{.REMOTE_STAGE_DIR}}/bundles"
   REMOTE_DEPLOYMENT_FILE: "{{.REMOTE_STAGE_DIR}}/deployment.yml"
   REMOTE_INIT_SCRIPT: "{{.REMOTE_STAGE_DIR}}/klm-init.sh"
 
+  SUDOERS_FILE: "/etc/sudoers.d/{{.SSH_USER}}"
+
   ENV_NAME: "Lab"
   OPENSPACE_TASK: "/opt/openspace/bin/task"
   ENV_TASKFILE: "/opt/openspace/env/{{.ENV_NAME}}/Taskfile.yml"
+
+  SYSTEMD_UNIT_NAME: "klm"
+  SYSTEMD_LOG_DIR: "/var/log/klm"
 
 tasks:
   default:
@@ -33,6 +37,30 @@ tasks:
       - test -f {{.LOCAL_INIT_SCRIPT}} || { echo "Missing {{.LOCAL_INIT_SCRIPT}}"; exit 1; }
       - test -d {{.DIST_DIR}} || sudo mkdir -p {{.DIST_DIR}}
       - ssh -o BatchMode=yes -o ConnectTimeout=5 {{.REMOTE}} "echo Remote access OK"
+
+  prereq:remote:sudo:
+    desc: Ensure remote user has passwordless sudo
+    interactive: true
+    cmds:
+      - |
+        ssh {{.REMOTE}} '
+          set -e
+
+          if sudo -n true 2>/dev/null; then
+            echo "[OK] {{.SSH_USER}} already has passwordless sudo"
+            exit 0
+          fi
+
+          echo "[WARN] {{.SSH_USER}} does not have passwordless sudo"
+          echo "[INFO] Attempting to create sudoers file. This requires sudo/root access."
+
+          echo "{{.SSH_USER}} ALL=(ALL) NOPASSWD:ALL" | sudo tee {{.SUDOERS_FILE}} >/dev/null
+          sudo chmod 0440 {{.SUDOERS_FILE}}
+          sudo visudo -cf {{.SUDOERS_FILE}}
+
+          sudo -n true
+          echo "[OK] Passwordless sudo configured for {{.SSH_USER}}"
+        '
 
   bundle:
     desc: Build all bundles
@@ -103,12 +131,13 @@ tasks:
     interactive: true
     cmds:
       - task: preflight
+      - task: prereq:remote:sudo
       - task: bundle
       - task: deploy:copy
       - task: deploy:run:klm-init
 
   deploy:full:
-    desc: Build, copy, run klm-init, then run basekit full install
+    desc: Build, copy, init, then start basekit full install as systemd unit
     interactive: true
     cmds:
       - task: deploy:init-only
@@ -130,18 +159,74 @@ tasks:
       - ssh {{.REMOTE}} "sudo bash {{.REMOTE_INIT_SCRIPT}} --config {{.REMOTE_DEPLOYMENT_FILE}} --bundles {{.REMOTE_BUNDLE_DIR}}/*"
 
   deploy:run:basekit:full-install:
-    desc: Run basekit full install task on build server
+    desc: Run basekit full install through the klm systemd unit
     interactive: true
     cmds:
-      - ssh {{.REMOTE}} "sudo {{.OPENSPACE_TASK}} -t {{.ENV_TASKFILE}} basekit:full-install"
+      - task: remote:systemd-task
+        vars:
+          TASK: basekit:full-install
 
   remote:task:
-    desc: Run an arbitrary OpenSpace task on the remote server
+    desc: Run an arbitrary OpenSpace task directly on the remote server
     interactive: true
     requires:
       vars: [TASK]
     cmds:
       - ssh {{.REMOTE}} "sudo {{.OPENSPACE_TASK}} -t {{.ENV_TASKFILE}} {{.TASK}}"
+
+    remote:systemd-task:
+    desc: Run an OpenSpace task remotely through the stable klm systemd unit
+    interactive: true
+    requires:
+      vars: [TASK]
+    cmds:
+      - |
+        ssh {{.REMOTE}} '
+          set -e
+
+          sudo mkdir -p {{.SYSTEMD_LOG_DIR}}
+
+          sudo systemd-run \
+            --unit={{.SYSTEMD_UNIT_NAME}} \
+            --description="KLM remote task runner" \
+            --property=Type=oneshot \
+            --property=RemainAfterExit=yes \
+            --property=StandardOutput=append:{{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log \
+            --property=StandardError=append:{{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log \
+            {{.OPENSPACE_TASK}} \
+              -t {{.ENV_TASKFILE}} \
+              {{.TASK}}
+
+          echo "[OK] Started systemd unit: {{.SYSTEMD_UNIT_NAME}}"
+          echo ""
+          echo "Follow logs:"
+          echo "  sudo journalctl -u {{.SYSTEMD_UNIT_NAME}} -f"
+          echo ""
+          echo "Persistent log:"
+          echo "  sudo tail -f {{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log"
+        '
+
+  remote:systemd-status:
+    desc: Check klm systemd unit status
+    cmds:
+      - ssh {{.REMOTE}} "sudo systemctl status {{.SYSTEMD_UNIT_NAME}} --no-pager"
+
+  remote:systemd-logs:
+    desc: Follow klm systemd logs
+    interactive: true
+    cmds:
+      - ssh {{.REMOTE}} "sudo journalctl -u {{.SYSTEMD_UNIT_NAME}} -f"
+
+  remote:systemd-log-file:
+    desc: Follow persistent klm log file
+    interactive: true
+    cmds:
+      - ssh {{.REMOTE}} "sudo tail -f {{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log"
+
+  remote:systemd-reset:
+    desc: Reset failed klm unit state
+    cmds:
+      - ssh {{.REMOTE}} "sudo systemctl reset-failed {{.SYSTEMD_UNIT_NAME}} || true"
 
   clean:deployment:
     desc: Clean remote deployment artifacts
@@ -149,8 +234,17 @@ tasks:
     cmds:
       - test "{{.CONFIRM}}" = "yes" || { echo "Re-run with CONFIRM=yes"; exit 1; }
       - ssh {{.REMOTE}} "sudo truncate -s 0 /root/.ssh/known_hosts || true"
-      - task: remote:task TASK=basekit:osms-vm:destroy || true
-      - task: remote:task TASK=basekit:mcm-vm:destroy || true
-      - task: remote:task TASK=basekit:opnsense:destroy || true
+      - task: remote:task
+        vars:
+          TASK: basekit:osms-vm:destroy
+        ignore_error: true
+      - task: remote:task
+        vars:
+          TASK: basekit:mcm-vm:destroy
+        ignore_error: true
+      - task: remote:task
+        vars:
+          TASK: basekit:opnsense:destroy
+        ignore_error: true
       - ssh {{.REMOTE}} "sudo rm -rf -- /opt/openspace"
       - ssh {{.REMOTE}} "sudo rm -rf -- {{.REMOTE_STAGE_DIR}}"

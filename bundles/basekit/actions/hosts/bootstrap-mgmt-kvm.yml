@@ -49,7 +49,7 @@
           }}
         method4: manual
         method6: disabled
-        stp: false
+        stp: true
         autoconnect: true
         state: present
       loop: "{{ host_bridges }}"
