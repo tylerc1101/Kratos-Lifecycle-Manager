@@ -1,101 +1,12 @@
 ---
 - name: Bootstrap mgmt-kvm server
-  hosts: klm-host
+  hosts: all
+  gather_facts: false
   become: true
+  connection: local
+  serial: 1
 
   tasks:
-    - name: Build list of host bridges
-      set_fact:
-        host_bridges: >-
-          {{
-            network.interfaces
-            | default({})
-            | dict2items
-            | selectattr('value.type', 'equalto', 'bridge')
-            | list
-          }}
-
-    - name: Validate bridge definitions
-      assert:
-        that:
-          - item.value.ip is defined
-          - item.value.physical_interface is defined
-          - item.value.prefix is defined or networks.bridges[item.key].cidr is defined
-        fail_msg: >-
-          Bridge {{ item.key }} must define ip, physical_interface, and either
-          network.interfaces.{{ item.key }}.prefix or networks.bridges.{{ item.key }}.cidr.
-      loop: "{{ host_bridges }}"
-      loop_control:
-        label: "{{ item.key }}"
-
-    - name: Create NetworkManager bridge connections
-      community.general.nmcli:
-        type: bridge
-        conn_name: "{{ item.key }}"
-        ifname: "{{ item.key }}"
-        ip4: >-
-          {{
-            item.value.ip ~ '/' ~
-            (
-              item.value.prefix
-              | default(networks.bridges[item.key].cidr.split('/')[1])
-            )
-          }}
-        gw4: >-
-          {{
-            networks.bridges[item.key].gateway
-            if item.value.default_route | default(false)
-            else omit
-          }}
-        method4: manual
-        method6: disabled
-        stp: true
-        autoconnect: true
-        state: present
-      loop: "{{ host_bridges }}"
-      loop_control:
-        label: "{{ item.key }}"
-
-    - name: Attach physical interfaces to bridges
-      community.general.nmcli:
-        type: bridge-slave
-        conn_name: "{{ item.value.physical_interface }}-to-{{ item.key }}"
-        ifname: "{{ item.value.physical_interface }}"
-        master: "{{ item.key }}"
-        autoconnect: true
-        state: present
-      loop: "{{ host_bridges }}"
-      loop_control:
-        label: "{{ item.value.physical_interface }} -> {{ item.key }}"
-
-    - name: Bring bridge slave connections up
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - connection
-          - up
-          - "{{ item.value.physical_interface }}-to-{{ item.key }}"
-      loop: "{{ host_bridges }}"
-      loop_control:
-        label: "{{ item.value.physical_interface }}-to-{{ item.key }}"
-      register: bridge_slave_up
-      changed_when: "'successfully activated' in bridge_slave_up.stdout"
-      failed_when: bridge_slave_up.rc != 0
-
-    - name: Bring bridge connections up
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - connection
-          - up
-          - "{{ item.key }}"
-      loop: "{{ host_bridges }}"
-      loop_control:
-        label: "{{ item.key }}"
-      register: bridge_up
-      changed_when: "'successfully activated' in bridge_up.stdout"
-      failed_when: bridge_up.rc != 0
-
     - name: Create KLM repo file
       yum_repository:
         name: "{{ repo_item.key }}"
@@ -116,19 +27,6 @@
       dnf:
         update_cache: true
       when: repo_result.changed
-
-    - name: Configure /etc/resolv.conf
-      copy:
-        dest: /etc/resolv.conf
-        owner: root
-        group: root
-        mode: "0644"
-        backup: true
-        content: |
-          # Managed by Ansible
-          {% for dns_server in networks.dns_servers %}
-          nameserver {{ dns_server }}
-          {% endfor %}
 
     - name: Set system hostname from inventory
       hostname:
@@ -170,5 +68,5 @@
       copy:
         dest: /etc/sudoers.d/{{ ansible_user }}
         content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
-        mode: '0440'
-        validate: 'visudo -cf %s'
+        mode: "0440"
+        validate: "visudo -cf %s"

@@ -1,0 +1,235 @@
+---
+- name: Bootstrap mgmt-kvm server
+  hosts: all
+  gather_facts: false
+  become: true
+  connection: local
+  serial: 1
+
+
+  # nmcli con add ifname br-wan type bridge con-name br-wan
+  # nmcli con modify br-wan ipv4.method static ipv4.address 10.243.77.213/23 ipv4.gateway 10.243.76.1 ipv6.method disable
+  # nmcli con down eno12409
+  # nmcli con modify eno12409 master br-wan
+  # nmcli con up eno12409
+  # nmcli con up br-wan
+
+
+  tasks:
+    - name: Build list of host bridges
+      set_fact:
+        host_bridges: >-
+          {{
+            network.interfaces
+            | default({})
+            | dict2items
+            | selectattr('value.type', 'equalto', 'bridge')
+            | list
+          }}
+
+    - name: Validate bridge definitions
+      assert:
+        that:
+          - item.value.ip is defined
+          - item.value.physical_interface is defined
+          - item.value.prefix is defined or networks.bridges[item.key].cidr is defined
+        fail_msg: >-
+          Bridge {{ item.key }} must define ip, physical_interface, and either
+          network.interfaces.{{ item.key }}.prefix or networks.bridges.{{ item.key }}.cidr.
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Disable standalone physical NIC profiles used by bridges
+      community.general.nmcli:
+        conn_name: "{{ item.value.physical_interface }}"
+        autoconnect: false
+        state: present
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.value.physical_interface }}"
+      failed_when: false
+
+    - name: Remove standalone physical NIC profiles used by bridges
+      community.general.nmcli:
+        conn_name: "{{ item.value.physical_interface }}"
+        state: absent
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.value.physical_interface }}"
+      failed_when: false
+
+    - name: Create NetworkManager bridge connections
+      community.general.nmcli:
+        type: bridge
+        conn_name: "{{ item.key }}"
+        ifname: "{{ item.key }}"
+        ip4: >-
+          {{
+            item.value.ip ~ '/' ~
+            (
+              item.value.prefix
+              | default(networks.bridges[item.key].cidr.split('/')[1])
+            )
+          }}
+        gw4: >-
+          {{
+            networks.bridges[item.key].gateway
+            if item.value.default_route | default(false)
+            else omit
+          }}
+        method4: manual
+        method6: disabled
+        stp: true
+        autoconnect: true
+        state: present
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Attach physical interfaces to bridges
+      community.general.nmcli:
+        type: bridge-slave
+        conn_name: "{{ item.key }}-{{ item.value.physical_interface }}"
+        ifname: "{{ item.value.physical_interface }}"
+        master: "{{ item.key }}"
+        hairpin: false
+        autoconnect: true
+        state: present
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.value.physical_interface }} -> {{ item.key }}"
+
+    - name: Bring bridge connections up first
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - connection
+          - up
+          - "{{ item.key }}"
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.key }}"
+      register: bridge_up
+      changed_when: "'successfully activated' in bridge_up.stdout"
+      failed_when: bridge_up.rc != 0
+
+    - name: Bring bridge slave connections up
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - connection
+          - up
+          - "{{ item.key }}-{{ item.value.physical_interface }}"
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.key }}-{{ item.value.physical_interface }}"
+      register: bridge_slave_up
+      changed_when: "'successfully activated' in bridge_slave_up.stdout"
+      failed_when: bridge_slave_up.rc != 0
+
+    - name: Verify bridge slave hairpin mode is disabled
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - -g
+          - bridge-port.hairpin-mode
+          - connection
+          - show
+          - "{{ item.key }}-{{ item.value.physical_interface }}"
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.key }}-{{ item.value.physical_interface }}"
+      register: hairpin_check
+      changed_when: false
+      failed_when: hairpin_check.stdout | trim != "no"
+
+    - name: Verify physical interfaces are enslaved to expected bridges
+      ansible.builtin.command:
+        argv:
+          - bash
+          - -lc
+          - "basename $(readlink /sys/class/net/{{ item.value.physical_interface }}/master)"
+      loop: "{{ host_bridges }}"
+      loop_control:
+        label: "{{ item.value.physical_interface }} -> {{ item.key }}"
+      register: bridge_master_check
+      changed_when: false
+      failed_when: bridge_master_check.stdout | trim != item.key
+
+    - name: Create KLM repo file
+      yum_repository:
+        name: "{{ repo_item.key }}"
+        description: "{{ repo_item.value.name }}"
+        baseurl: "{{ repo_item.value.baseurl }}"
+        enabled: "{{ repo_item.value.enabled | default(1) | bool }}"
+        gpgcheck: "{{ repo_item.value.gpgcheck | default(1) | bool }}"
+        failovermethod: "{{ repo_item.value.failovermethod | default(omit) }}"
+        file: "{{ repo.file }}"
+        state: present
+      loop: "{{ repo.entries | dict2items }}"
+      loop_control:
+        loop_var: repo_item
+        label: "{{ repo_item.key }}"
+      register: repo_result
+
+    - name: Configure /etc/resolv.conf
+      copy:
+        dest: /etc/resolv.conf
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+        content: |
+          # Managed by Ansible
+          {% for dns_server in networks.dns_servers %}
+          nameserver {{ dns_server }}
+          {% endfor %}
+
+    - name: Refresh DNF metadata
+      dnf:
+        update_cache: true
+      when: repo_result.changed
+
+    - name: Set system hostname from inventory
+      hostname:
+        name: "{{ hostname }}.{{ domain_name }}"
+
+    - name: Install required packages
+      yum:
+        name:
+          - "@Development Tools"
+          - "@Virtualization Platform"
+          - "@Container Management"
+          - "@Headless Management"
+          - gcc
+          - openssl-devel
+          - bzip2-devel
+          - libffi-devel
+          - zlib-devel
+          - xz-devel
+          - readline-devel
+          - sqlite-devel
+          - wget
+          - virt-install
+          - cockpit-machines
+          - libcdio
+          - libguestfs
+        state: present
+        disable_gpg_check: yes
+
+    - name: Start/Enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - libvirtd
+        - cockpit.socket
+
+    - name: Create sudoers entry for user
+      copy:
+        dest: /etc/sudoers.d/{{ ansible_user }}
+        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: "visudo -cf %s"

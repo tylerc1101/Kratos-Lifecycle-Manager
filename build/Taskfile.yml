@@ -1,9 +1,10 @@
 version: '3'
 
 vars:
-  BUILD_SERVER: "10.243.76.38"
+  BUILD_SERVER: "10.243.77.213"
   SSH_USER: "kratos"
   REMOTE: "{{.SSH_USER}}@{{.BUILD_SERVER}}"
+  SSH_OPTS: "-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/root/.ssh/known_hosts"
 
   KLM_DIR: "/opt/Kratos-Lifecycle-Manager"
   DIST_DIR: "{{.KLM_DIR}}/dist"
@@ -36,14 +37,14 @@ tasks:
       - test -f {{.LOCAL_DEPLOYMENT_FILE}} || { echo "Missing {{.LOCAL_DEPLOYMENT_FILE}}"; exit 1; }
       - test -f {{.LOCAL_INIT_SCRIPT}} || { echo "Missing {{.LOCAL_INIT_SCRIPT}}"; exit 1; }
       - test -d {{.DIST_DIR}} || sudo mkdir -p {{.DIST_DIR}}
-      - ssh -o BatchMode=yes -o ConnectTimeout=5 {{.REMOTE}} "echo Remote access OK"
+      - ssh {{.SSH_OPTS}} -o BatchMode=yes -o ConnectTimeout=5 {{.REMOTE}} "echo Remote access OK"
 
   prereq:remote:sudo:
     desc: Ensure remote user has passwordless sudo
     interactive: true
     cmds:
       - |
-        ssh {{.REMOTE}} '
+        ssh {{.SSH_OPTS}} -tt {{.REMOTE}} '
           set -e
 
           if sudo -n true 2>/dev/null; then
@@ -52,7 +53,7 @@ tasks:
           fi
 
           echo "[WARN] {{.SSH_USER}} does not have passwordless sudo"
-          echo "[INFO] Attempting to create sudoers file. This requires sudo/root access."
+          echo "[INFO] You may be prompted for the remote sudo password once."
 
           echo "{{.SSH_USER}} ALL=(ALL) NOPASSWD:ALL" | sudo tee {{.SUDOERS_FILE}} >/dev/null
           sudo chmod 0440 {{.SUDOERS_FILE}}
@@ -147,16 +148,16 @@ tasks:
     desc: Stage deployment files and bundles on build server
     interactive: true
     cmds:
-      - ssh {{.REMOTE}} "rm -rf {{.REMOTE_STAGE_DIR}} && mkdir -p {{.REMOTE_BUNDLE_DIR}}"
-      - scp {{.LOCAL_DEPLOYMENT_FILE}} {{.REMOTE}}:{{.REMOTE_DEPLOYMENT_FILE}}
-      - scp {{.LOCAL_INIT_SCRIPT}} {{.REMOTE}}:{{.REMOTE_INIT_SCRIPT}}
-      - scp {{.DIST_DIR}}/* {{.REMOTE}}:{{.REMOTE_BUNDLE_DIR}}/
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "rm -rf {{.REMOTE_STAGE_DIR}} && mkdir -p {{.REMOTE_BUNDLE_DIR}}"
+      - scp {{.SSH_OPTS}} {{.LOCAL_DEPLOYMENT_FILE}} {{.REMOTE}}:{{.REMOTE_DEPLOYMENT_FILE}}
+      - scp {{.SSH_OPTS}} {{.LOCAL_INIT_SCRIPT}} {{.REMOTE}}:{{.REMOTE_INIT_SCRIPT}}
+      - scp {{.SSH_OPTS}} {{.DIST_DIR}}/* {{.REMOTE}}:{{.REMOTE_BUNDLE_DIR}}/
 
   deploy:run:klm-init:
     desc: Run klm-init on build server
     interactive: true
     cmds:
-      - ssh {{.REMOTE}} "sudo bash {{.REMOTE_INIT_SCRIPT}} --config {{.REMOTE_DEPLOYMENT_FILE}} --bundles {{.REMOTE_BUNDLE_DIR}}/*"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo bash {{.REMOTE_INIT_SCRIPT}} --config {{.REMOTE_DEPLOYMENT_FILE}} --bundles {{.REMOTE_BUNDLE_DIR}}/*"
 
   deploy:run:basekit:full-install:
     desc: Run basekit full install through the klm systemd unit
@@ -172,19 +173,28 @@ tasks:
     requires:
       vars: [TASK]
     cmds:
-      - ssh {{.REMOTE}} "sudo {{.OPENSPACE_TASK}} -t {{.ENV_TASKFILE}} {{.TASK}}"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo {{.OPENSPACE_TASK}} -t {{.ENV_TASKFILE}} {{.TASK}}"
 
-    remote:systemd-task:
+  remote:systemd-task:
     desc: Run an OpenSpace task remotely through the stable klm systemd unit
     interactive: true
     requires:
       vars: [TASK]
     cmds:
       - |
-        ssh {{.REMOTE}} '
+        ssh {{.SSH_OPTS}} {{.REMOTE}} '
           set -e
 
           sudo mkdir -p {{.SYSTEMD_LOG_DIR}}
+
+          if systemctl is-active --quiet {{.SYSTEMD_UNIT_NAME}}; then
+            echo "[ERROR] {{.SYSTEMD_UNIT_NAME}} is already running."
+            echo "Follow logs with:"
+            echo "  sudo journalctl -u {{.SYSTEMD_UNIT_NAME}} -f"
+            exit 1
+          fi
+
+          sudo systemctl reset-failed {{.SYSTEMD_UNIT_NAME}} 2>/dev/null || true
 
           sudo systemd-run \
             --unit={{.SYSTEMD_UNIT_NAME}} \
@@ -199,41 +209,41 @@ tasks:
 
           echo "[OK] Started systemd unit: {{.SYSTEMD_UNIT_NAME}}"
           echo ""
-          echo "Follow logs:"
+          echo "Follow journal:"
           echo "  sudo journalctl -u {{.SYSTEMD_UNIT_NAME}} -f"
           echo ""
-          echo "Persistent log:"
+          echo "Follow persistent log:"
           echo "  sudo tail -f {{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log"
         '
 
   remote:systemd-status:
     desc: Check klm systemd unit status
     cmds:
-      - ssh {{.REMOTE}} "sudo systemctl status {{.SYSTEMD_UNIT_NAME}} --no-pager"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo systemctl status {{.SYSTEMD_UNIT_NAME}} --no-pager"
 
   remote:systemd-logs:
-    desc: Follow klm systemd logs
+    desc: Follow klm systemd journal logs
     interactive: true
     cmds:
-      - ssh {{.REMOTE}} "sudo journalctl -u {{.SYSTEMD_UNIT_NAME}} -f"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo journalctl -u {{.SYSTEMD_UNIT_NAME}} -f"
 
   remote:systemd-log-file:
     desc: Follow persistent klm log file
     interactive: true
     cmds:
-      - ssh {{.REMOTE}} "sudo tail -f {{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo tail -f {{.SYSTEMD_LOG_DIR}}/{{.SYSTEMD_UNIT_NAME}}.log"
 
   remote:systemd-reset:
     desc: Reset failed klm unit state
     cmds:
-      - ssh {{.REMOTE}} "sudo systemctl reset-failed {{.SYSTEMD_UNIT_NAME}} || true"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo systemctl reset-failed {{.SYSTEMD_UNIT_NAME}} || true"
 
   clean:deployment:
     desc: Clean remote deployment artifacts
     interactive: true
     cmds:
       - test "{{.CONFIRM}}" = "yes" || { echo "Re-run with CONFIRM=yes"; exit 1; }
-      - ssh {{.REMOTE}} "sudo truncate -s 0 /root/.ssh/known_hosts || true"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo truncate -s 0 /root/.ssh/known_hosts || true"
       - task: remote:task
         vars:
           TASK: basekit:osms-vm:destroy
@@ -246,5 +256,5 @@ tasks:
         vars:
           TASK: basekit:opnsense:destroy
         ignore_error: true
-      - ssh {{.REMOTE}} "sudo rm -rf -- /opt/openspace"
-      - ssh {{.REMOTE}} "sudo rm -rf -- {{.REMOTE_STAGE_DIR}}"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo rm -rf -- /opt/openspace"
+      - ssh {{.SSH_OPTS}} {{.REMOTE}} "sudo rm -rf -- {{.REMOTE_STAGE_DIR}}"
