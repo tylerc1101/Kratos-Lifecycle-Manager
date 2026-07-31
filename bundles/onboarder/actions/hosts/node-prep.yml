@@ -95,6 +95,7 @@
         name: "{{ required_packages }}"
         state: present
         update_cache: true
+        disable_gpg_check: yes
 
     - name: Copy rke2-selinux package to host
       ansible.builtin.copy:
