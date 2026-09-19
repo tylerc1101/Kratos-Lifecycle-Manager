@@ -7,7 +7,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-BUNDLE_DIR="$(realpath "$1")"
+BUNDLE_DIR="/opt/Kratos-Lifecycle-Manager/bundles/${1}"
 PUBLISH_DIR="${PUBLISH_DIR:-/opt/klm-repository/bundles}"
 
 if [ ! -d "${BUNDLE_DIR}" ]; then
