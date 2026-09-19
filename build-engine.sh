@@ -28,9 +28,9 @@ if [ ! -f "${VERSION_FILE}" ]; then
     exit 1
 fi
 
-if [ ! -f "${PROJECT_ROOT}/Containerfile" ]; then
+if [ ! -f "${PROJECT_ROOT}/engine/Containerfile" ]; then
     echo "ERROR: Missing Containerfile:"
-    echo "  ${PROJECT_ROOT}/Containerfile"
+    echo "  ${PROJECT_ROOT}/engine/Containerfile"
     exit 1
 fi
 
@@ -61,7 +61,7 @@ echo
 
 podman build \
     --tag "${FULL_IMAGE}" \
-    --file "${PROJECT_ROOT}/Containerfile" \
+    --file "${PROJECT_ROOT}/engine/Containerfile" \
     "${PROJECT_ROOT}"
 
 
@@ -97,6 +97,7 @@ mv \
     "${PUBLISH_DIR}/${OUTPUT_NAME}"
 
 chmod 0644 "${PUBLISH_DIR}/${OUTPUT_NAME}"
+chown kratos:kratos "${PUBLISH_DIR}/${OUTPUT_NAME}"
 
 
 echo

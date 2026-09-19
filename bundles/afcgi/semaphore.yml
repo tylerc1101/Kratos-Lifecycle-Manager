@@ -1,0 +1,145 @@
+# Contract-level resources are available to whichever AFCGI system is selected.
+repositories:
+  - name: AFCGI Environment
+    url: file:///opt/openspace/environments/afcgi
+    branch: main
+
+systems:
+  SKCT2:
+    inventories:
+      - name: SKCT2
+        type: file
+        inventory: inventory/skct2.yml
+        repository: AFCGI Environment
+        ssh_key: AFCGI SSH User
+        become_key: AFCGI Root
+
+    views:
+      - name: SKCT2
+
+    templates:
+      - name: SKCT2 Ping
+        description: SKCT2-bound use of the reusable Onboarder ping automation
+        view: SKCT2
+        repository: Onboarder
+        inventory: SKCT2
+        playbook: playbooks/ping.yml
+
+      - name: SKCT2 Onboard
+        description: SKCT2-bound use of the reusable Onboarder automation
+        view: SKCT2
+        repository: Onboarder
+        inventory: SKCT2
+        playbook: playbooks/onboard-system.yml
+
+      - name: SKCT2 BaseKit Precheck
+        description: SKCT2-bound use of the BaseKit architecture precheck
+        view: SKCT2
+        repository: BaseKit
+        inventory: SKCT2
+        playbook: playbooks/precheck.yml
+
+      - name: SKCT2 Deploy OpenSpace
+        description: SKCT2-bound use of reusable OpenSpace deployment automation
+        view: SKCT2
+        repository: OpenSpace
+        inventory: SKCT2
+        playbook: playbooks/deploy-openspace.yml
+
+      - name: SKCT2 Root Access Check
+        description: Verify username/password SSH plus su-to-root become credentials
+        view: SKCT2
+        repository: AFCGI Environment
+        inventory: SKCT2
+        playbook: playbooks/root-access-check.yml
+
+    workflows:
+      - name: Build SKCT2
+        description: Example start-to-finish SKCT2 workflow tailored by the AFCGI environment
+        view: SKCT2
+        nodes:
+          - id: ping
+            type: task
+            template: SKCT2 Ping
+            x: 0
+            y: 0
+          - id: onboard
+            type: task
+            template: SKCT2 Onboard
+            x: 300
+            y: 0
+          - id: root
+            type: task
+            template: SKCT2 Root Access Check
+            x: 600
+            y: 0
+          - id: basekit
+            type: task
+            template: SKCT2 BaseKit Precheck
+            x: 900
+            y: 0
+          - id: openspace
+            type: task
+            template: SKCT2 Deploy OpenSpace
+            x: 1200
+            y: 0
+        edges:
+          - from: ping
+            to: onboard
+            condition: on_success
+          - from: onboard
+            to: root
+            condition: on_success
+          - from: root
+            to: basekit
+            condition: on_success
+          - from: basekit
+            to: openspace
+            condition: on_success
+
+  GEP1:
+    inventories:
+      - name: GEP1
+        type: file
+        inventory: inventory/gep1.yml
+        repository: AFCGI Environment
+        ssh_key: AFCGI SSH User
+        become_key: AFCGI Root
+
+    views:
+      - name: GEP1
+
+    templates:
+      - name: GEP1 Ping
+        description: GEP1-bound use of the reusable Onboarder ping automation
+        view: GEP1
+        repository: Onboarder
+        inventory: GEP1
+        playbook: playbooks/ping.yml
+
+      - name: GEP1 Validate OpenSpace
+        description: GEP1-bound use of reusable OpenSpace validation automation
+        view: GEP1
+        repository: OpenSpace
+        inventory: GEP1
+        playbook: playbooks/validate-openspace.yml
+
+    workflows:
+      - name: Validate GEP1
+        description: Example GEP1-specific validation workflow
+        view: GEP1
+        nodes:
+          - id: ping
+            type: task
+            template: GEP1 Ping
+            x: 0
+            y: 0
+          - id: validate
+            type: task
+            template: GEP1 Validate OpenSpace
+            x: 300
+            y: 0
+        edges:
+          - from: ping
+            to: validate
+            condition: on_success

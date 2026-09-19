@@ -1,0 +1,19 @@
+name: afcgi
+version: 1.0.0
+type: environment
+enabled: true
+description: Example AFCGI contract environment
+systems:
+  - name: SKCT2
+    enabled: true
+    description: SKCT2 configuration within the AFCGI contract
+    requires:
+      - name: basekit
+        version: 1.0.0
+
+  - name: GEP1
+    enabled: true
+    description: GEP1 configuration within the AFCGI contract
+    requires:
+      - name: basekit
+        version: 1.0.0

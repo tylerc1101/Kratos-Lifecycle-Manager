@@ -1,0 +1,11 @@
+---
+all:
+  vars:
+    ansible_become: true
+    ansible_become_method: su
+    ansible_become_user: root
+  children:
+    gep1:
+      hosts:
+        gep1-host:
+          ansible_host: 192.0.2.30

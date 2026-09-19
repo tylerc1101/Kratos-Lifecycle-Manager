@@ -78,6 +78,7 @@ mv "${TMP_DIR}/${OUTPUT_NAME}" \
    "${PUBLISH_DIR}/${OUTPUT_NAME}"
 
 chmod 0644 "${PUBLISH_DIR}/${OUTPUT_NAME}"
+chown kratos:kratos "${PUBLISH_DIR}/${OUTPUT_NAME}"
 
 echo
 echo "Bundle created:"
