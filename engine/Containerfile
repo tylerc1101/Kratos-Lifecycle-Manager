@@ -9,7 +9,7 @@ USER root
 # Repositories
 # ---------------------------------------------------------------------------
 
-COPY engine/repos/ /etc/yum.repos.d/
+COPY repos/ /etc/yum.repos.d/
 
 # ---------------------------------------------------------------------------
 # KLM Engine dependencies
@@ -60,27 +60,27 @@ RUN dnf -y --allowerasing --nogpgcheck install \
     && rm -rf /var/cache/dnf
 
 
-# ---------------------------------------------------------------------------
-# KLM binaries
-#
-# This directory can contain:
-#   semaphore
-#   klm-engine
-#   kubectl
-#   helm
-#   other KLM-managed binaries
-# ---------------------------------------------------------------------------
 
-COPY engine/bin/ /usr/local/bin/
+COPY bin/klm-engine /usr/local/bin/klm-engine
 
-RUN chmod 0755 /usr/local/bin/*
+RUN chmod 0755 /usr/local/bin/klm-engine
 
 
 #----------------------------------------------------------------------------
 # KLM scripts
 #----------------------------------------------------------------------------
 
-COPY engine/klm /opt/klm
+COPY klm/ /opt/klm
+
+
+
+# ---------------------------------------------------------------------------
+# Semaphore configuration
+# ---------------------------------------------------------------------------
+
+COPY images/semaphore /usr/local/bin/semaphore
+
+RUN chmod 0755 /usr/local/bin/semaphore
 
 # ---------------------------------------------------------------------------
 # Semaphore configuration
@@ -88,7 +88,7 @@ COPY engine/klm /opt/klm
 
 RUN mkdir -p /etc/klm
 
-COPY engine/config.json /etc/klm/config.json
+COPY config.json /etc/klm/config.json
 
 
 # ---------------------------------------------------------------------------
