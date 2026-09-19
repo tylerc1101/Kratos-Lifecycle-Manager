@@ -17,6 +17,182 @@ MANAGED_FIELDS = (
 )
 
 
+def resolve_template_inventories(
+    client,
+    desired_templates,
+    desired_inventories,
+    state,
+    environment_bundle=None,
+    selected_system=None,
+):
+    """Resolve and validate every template inventory before child mutations.
+
+    Resolution order for a template that omits ``inventory``:
+
+    1. If an environment/system is selected and that system defines exactly
+       one KLM-managed inventory, use it.
+    2. Without an environment, if desired state defines exactly one managed
+       inventory, use it.
+    3. Otherwise, if exactly one operator-created Semaphore inventory exists,
+       use it.
+    4. Never guess when more than one candidate exists.
+
+    Explicit inventory names may point either to a desired KLM-managed
+    inventory or to an operator-created Semaphore inventory. KLM does not adopt
+    or prune operator-created inventories.
+    """
+    if not desired_templates:
+        return
+
+    desired_by_name = {item.name: item for item in desired_inventories}
+    live_inventories = client.list_inventories()
+
+    # Anything recorded in ownership state belongs to KLM. If it is no longer
+    # part of desired state, it may be pruned later and must not become the
+    # implicit operator default.
+    owned_ids = {
+        resource_id
+        for resource_id in state.inventories.values()
+        if resource_id is not None
+    }
+    operator_inventories = [
+        item
+        for item in live_inventories
+        if item.get("id") not in owned_ids
+    ]
+
+    _validate_explicit_inventory_references(
+        desired_templates,
+        desired_by_name,
+        operator_inventories,
+    )
+
+    unresolved = [
+        item
+        for item in desired_templates
+        if not item.inventory_name
+    ]
+    if not unresolved:
+        return
+
+    default_name = ""
+    default_reason = ""
+
+    if environment_bundle is not None and selected_system is not None:
+        system_inventories = [
+            item
+            for item in desired_inventories
+            if item.bundle_name == environment_bundle.name
+            and item.system_name == selected_system.name
+        ]
+
+        if len(system_inventories) == 1:
+            default_name = system_inventories[0].name
+            default_reason = "selected environment/system"
+        elif len(system_inventories) > 1:
+            names = ", ".join(sorted(item.name for item in system_inventories))
+            raise ReconcileError(
+                "Selected environment '%s' system '%s' defines more than one "
+                "inventory (%s), so KLM cannot choose a default for templates "
+                "that omit inventory. Set inventory explicitly on those "
+                "templates."
+                % (environment_bundle.name, selected_system.name, names)
+            )
+    else:
+        if len(desired_inventories) == 1:
+            default_name = desired_inventories[0].name
+            default_reason = "single KLM-managed inventory"
+        elif len(desired_inventories) > 1:
+            names = ", ".join(sorted(item.name for item in desired_inventories))
+            raise ReconcileError(
+                "No environment is selected and desired state defines more "
+                "than one inventory (%s). KLM cannot choose a default for "
+                "templates that omit inventory. Set inventory explicitly on "
+                "those templates or select an environment/system." % names
+            )
+
+    if not default_name:
+        if len(operator_inventories) == 1:
+            default_name = str(operator_inventories[0].get("name") or "").strip()
+            if not default_name:
+                raise ReconcileError(
+                    "The only operator-created Semaphore inventory has no name"
+                )
+            default_reason = "single operator-created Semaphore inventory"
+        elif len(operator_inventories) == 0:
+            names = ", ".join(
+                sorted("%s / %s" % (item.view_name, item.name) for item in unresolved)
+            )
+            raise ReconcileError(
+                "Templates without an inventory cannot be reconciled because "
+                "no default inventory is available. Affected templates: %s. "
+                "Create one inventory in Semaphore, set inventory explicitly "
+                "in the bundle, or select an environment/system that defines "
+                "an inventory." % names
+            )
+        else:
+            choices = ", ".join(
+                "%s (id %s)" % (item.get("name", ""), item.get("id"))
+                for item in sorted(
+                    operator_inventories,
+                    key=lambda item: str(item.get("name", "")).lower(),
+                )
+            )
+            raise ReconcileError(
+                "More than one operator-created Semaphore inventory exists "
+                "(%s), so KLM cannot choose a default for templates that omit "
+                "inventory. Set inventory explicitly in the bundle or select "
+                "an environment/system." % choices
+            )
+
+    for item in unresolved:
+        item.inventory_name = default_name
+
+    LOG.info(
+        "Default inventory for templates without one: %s (%s)",
+        default_name,
+        default_reason,
+    )
+
+
+def _validate_explicit_inventory_references(
+    desired_templates,
+    desired_by_name,
+    operator_inventories,
+):
+    by_name = {}
+    for item in operator_inventories:
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        by_name.setdefault(name, []).append(item)
+
+    for template in desired_templates:
+        name = template.inventory_name
+        if not name or name in desired_by_name:
+            continue
+
+        matches = by_name.get(name, [])
+        if len(matches) == 1:
+            continue
+
+        if not matches:
+            available = ", ".join(sorted(by_name)) or "(none)"
+            raise ReconcileError(
+                "Template '%s / %s' references inventory '%s', but no desired "
+                "KLM inventory or operator-created Semaphore inventory with "
+                "that name exists. Operator inventories: %s"
+                % (template.view_name, template.name, name, available)
+            )
+
+        ids = ", ".join(str(item.get("id")) for item in matches)
+        raise ReconcileError(
+            "Template '%s / %s' references inventory '%s', but more than one "
+            "operator-created Semaphore inventory has that name (ids: %s)"
+            % (template.view_name, template.name, name, ids)
+        )
+
+
 def sync_templates(client, desired_templates, repository_ids, inventory_ids,
                    view_ids, state):
     existing = client.list_templates()
@@ -59,10 +235,12 @@ def _resolve_inventory_id(client, inventory_name, inventory_ids):
     - If an enabled bundle defines the inventory, use the KLM-managed ID.
     - If a name is supplied but no bundle defines it, resolve an existing
       Semaphore inventory by name and leave it operator-owned.
-    - If inventory is omitted, create the template without a default inventory.
+    - Inventory omission must already have been resolved by preflight.
     """
     if not inventory_name:
-        return None
+        raise ReconcileError(
+            "Template inventory was not resolved before template reconciliation"
+        )
 
     managed_id = inventory_ids.get(inventory_name)
     if managed_id is not None:

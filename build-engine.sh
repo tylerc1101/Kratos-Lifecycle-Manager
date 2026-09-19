@@ -62,7 +62,7 @@ echo
 podman build \
     --tag "${FULL_IMAGE}" \
     --file "${PROJECT_ROOT}/engine/Containerfile" \
-    "${PROJECT_ROOT}"
+    "${ENGINE_DIR}"
 
 
 # --------------------------------------------------

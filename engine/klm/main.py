@@ -20,7 +20,7 @@ import workflows
 from client import DRY_RUN_ID, SemaphoreApiError, SemaphoreClient
 from errors import ReconcileError
 
-KLM_VERSION = "1.2.1"
+KLM_VERSION = "1.2.2"
 LOG = logging.getLogger("klm")
 
 
@@ -54,14 +54,25 @@ def command_bundles_list(args):
         "KLM_BUNDLE_DIR",
         settings_module.DEFAULT_BUNDLE_DIR,
     )
+    environment_dir = os.environ.get(
+        "KLM_ENVIRONMENT_DIR",
+        settings_module.DEFAULT_ENVIRONMENT_DIR,
+    )
 
     bundles = bundle_loader.discover_bundles(bundle_dir)
+    environments = environment_selection.discover_environment_bundles(
+        environment_dir
+    )
+    installed = sorted(
+        bundles + environments,
+        key=lambda item: item.name.lower(),
+    )
 
-    if not bundles:
+    if not installed:
         print("No bundles installed.")
         return 0
 
-    for bundle in bundles:
+    for bundle in installed:
         enabled = "enabled" if bundle.enabled else "disabled"
         print(
             "%-20s %-10s %-12s %s"
@@ -100,6 +111,7 @@ def command_bundles_validate(args):
         "KLM_ENVIRONMENT_SELECTION_FILE",
         settings_module.DEFAULT_ENVIRONMENT_SELECTION_FILE,
     )
+    environments = environment_selection.discover_environment_bundles(env_dir)
     environment_bundle, selected_system = environment_selection.resolve_selection(
         env_dir, selection_file, required=False
     )
@@ -112,10 +124,11 @@ def command_bundles_validate(args):
 
     print("Bundle validation successful.")
     print("Project:      %s" % wanted.project.name)
-    print("Installed:    %d" % len(bundles))
+    installed = bundles + environments
+    print("Installed:    %d" % len(installed))
     print(
         "Enabled:      %d"
-        % len([item for item in bundles if item.enabled])
+        % len([item for item in installed if item.enabled])
     )
     if environment_bundle is not None:
         print("Environment:  %s" % environment_bundle.name)
@@ -281,6 +294,20 @@ def command_env(args):
     print("Then run:")
     print("  klm reconcile")
     return 0
+
+
+def command_bundle_validate_path(args):
+    """Validate one extracted bundle and emit machine-readable metadata."""
+    path = os.path.abspath(args.path)
+    if not os.path.isdir(path):
+        raise bundle_loader.BundleError(
+            "Bundle path does not exist: %s" % path
+        )
+
+    bundle = bundle_loader.load_bundle(path, os.path.basename(path))
+    print("%s\t%s\t%s" % (bundle.name, bundle.version, bundle.bundle_type))
+    return 0
+
 
 
 def command_env_validate_path(args):
@@ -457,6 +484,20 @@ def command_reconcile(args):
             return 0
 
         client.set_project_id(project_id)
+
+        # Resolve every template inventory before any child resources are
+        # created or updated. Reusable templates inherit the selected system's
+        # single inventory. Without an environment, one unambiguous operator-
+        # created Semaphore inventory may act as the default. KLM never guesses
+        # when more than one candidate exists.
+        templates.resolve_template_inventories(
+            client,
+            wanted.templates,
+            wanted.inventories,
+            ownership,
+            environment_bundle=environment_bundle,
+            selected_system=selected_system,
+        )
 
         repository_ids = repositories.sync_repositories(
             client,
@@ -676,6 +717,15 @@ def build_parser():
     )
     bundle_validate.set_defaults(
         func=command_bundles_validate,
+    )
+
+    bundle_validate_path = sub.add_parser(
+        "bundle-validate-path",
+        help=argparse.SUPPRESS,
+    )
+    bundle_validate_path.add_argument("path")
+    bundle_validate_path.set_defaults(
+        func=command_bundle_validate_path,
     )
 
     env = sub.add_parser(

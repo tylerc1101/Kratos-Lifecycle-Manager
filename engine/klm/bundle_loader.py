@@ -20,6 +20,7 @@ RESOURCE_KEYS = (
 )
 
 ALLOWED_SEMAPHORE_KEYS = RESOURCE_KEYS + ("systems",)
+ALLOWED_BUNDLE_TYPES = ("capability", "architecture", "environment")
 
 
 class BundleError(Exception):
@@ -116,8 +117,14 @@ def load_bundle(directory, directory_name):
 
     name = _required_string(metadata, "name", metadata_file)
     version = _required_string(metadata, "version", metadata_file)
-    bundle_type = _required_string(metadata, "type", metadata_file)
+    bundle_type = _required_string(metadata, "type", metadata_file).lower()
     description = str(metadata.get("description", ""))
+
+    if bundle_type not in ALLOWED_BUNDLE_TYPES:
+        raise BundleError(
+            "%s: unsupported bundle type '%s'. Allowed: %s"
+            % (metadata_file, bundle_type, ", ".join(ALLOWED_BUNDLE_TYPES))
+        )
 
     enabled = metadata.get("enabled", True)
     if not isinstance(enabled, bool):

@@ -228,7 +228,7 @@ def build_desired_state(
         if bundle.bundle_type == "environment":
             raise DesiredStateError(
                 "Environment bundle '%s' is installed in the normal bundle directory. "
-                "Import environment bundles with: klm env import" % bundle.name
+                "Import all bundle types with: klm bundles import" % bundle.name
             )
 
     active_bundles = [bundle for bundle in normal_bundles if bundle.enabled]
@@ -468,8 +468,10 @@ def _build_template(bundle, raw, system_name=""):
         )
     task_params = dict(task_params)
 
-    # A tool template may intentionally have no default inventory. In that
-    # case the operator chooses any Semaphore inventory at launch time.
+    # A reusable template may omit its inventory. Reconcile resolves a safe
+    # default later: the selected environment/system inventory when available,
+    # otherwise a single unambiguous Semaphore inventory. Keep inventory
+    # override enabled so reusable tools remain flexible at launch time.
     if not inventory and str(raw.get("app", "ansible")) == "ansible":
         task_params.setdefault("allow_override_inventory", True)
 
@@ -950,10 +952,10 @@ def _check_references(state):
             )
 
         # Inventory is intentionally different from repository/view.
-        # A template may reference an inventory managed by an environment
-        # bundle OR an operator-created inventory already present in Semaphore.
-        # If omitted entirely, the template is created without a default
-        # inventory and allow_override_inventory defaults to true.
+        # A template may reference an inventory managed by a bundle OR an
+        # operator-created inventory already present in Semaphore. Templates
+        # that omit inventory are resolved during reconcile before child API
+        # mutations begin.
         if template.inventory_name and template.inventory_name in inventory_names:
             pass
 

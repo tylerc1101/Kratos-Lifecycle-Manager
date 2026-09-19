@@ -12,6 +12,16 @@ KLM_SECRETS="${KLM_ROOT}/secrets"
 KLM_STAGING="${KLM_ROOT}/staging"
 
 KLM_STATE="${KLM_ROOT}/state"
+BUNDLE_IMPORT_TEMP=""
+
+
+cleanup() {
+    if [ -n "${BUNDLE_IMPORT_TEMP}" ] && [ -d "${BUNDLE_IMPORT_TEMP}" ]; then
+        rm -rf "${BUNDLE_IMPORT_TEMP}"
+    fi
+}
+
+trap cleanup EXIT
 
 
 usage() {
@@ -26,14 +36,15 @@ usage() {
     echo "  klm engine import"
     echo "  klm engine list"
     echo
-    echo "  klm env import"
+    echo "  klm bundles import"
+    echo "  klm bundles list"
+    echo "  klm bundles validate"
+    echo
     echo "  klm env <system>"
     echo "  klm env"
     echo
     echo "  klm version"
     echo "  klm doctor"
-    echo "  klm bundles list"
-    echo "  klm bundles validate"
     echo "  klm reconcile"
     echo "  klm reconcile --dry-run"
 }
@@ -86,17 +97,46 @@ get_engine_image() {
 }
 
 
+wait_for_semaphore() {
+    local attempt
+
+    for attempt in $(seq 1 30); do
+        if podman exec "${KLM_CONTAINER}" \
+            curl -ksf https://127.0.0.1:3000/api/ping \
+            >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "ERROR: Semaphore did not become ready within 30 seconds." >&2
+    return 1
+}
+
+
+ensure_klm_project() {
+    wait_for_semaphore
+
+    podman exec -i \
+        "${KLM_CONTAINER}" \
+        /usr/local/bin/klm-engine ensure-project
+}
+
+
 start_klm() {
     local engine_image
 
     if container_running; then
         echo "KLM is already running."
+        ensure_klm_project
         return
     fi
 
     if container_exists; then
         echo "Starting existing KLM container..."
-        podman start "${KLM_CONTAINER}"
+        podman start "${KLM_CONTAINER}" >/dev/null
+        ensure_klm_project
+        echo "KLM started."
         return
     fi
 
@@ -117,7 +157,10 @@ start_klm() {
         -v "${KLM_SECRETS}:${KLM_SECRETS}:ro,Z" \
         -v "${KLM_STAGING}:${KLM_STAGING}:ro,z" \
         -v "${KLM_STATE}:${KLM_STATE}:Z" \
-        "${engine_image}"
+        "${engine_image}" \
+        >/dev/null
+
+    ensure_klm_project
 
     echo
     echo "KLM started."
@@ -402,146 +445,255 @@ list_engines() {
 }
 
 
-import_environment() {
-    local env_bundles=()
-    local env_bundle
-    local temp_name
-    local temp_dir
+import_bundles() {
+    local bundle_files=()
+    local records=()
+    local bundle_file
+    local item_name
+    local item_dir
     local top_dir
     local extracted
+    local metadata
+    local name
+    local version
+    local bundle_type
     local target
     local artifact_dir
+    local record
+    local index=0
+
+    declare -A staged_names=()
 
     if ! container_running; then
-        echo "ERROR: KLM must be running before importing an environment." >&2
+        echo "ERROR: KLM must be running before importing bundles." >&2
         echo "Run: klm start" >&2
         exit 1
     fi
 
-    mapfile -t env_bundles < <(
+    mapfile -t bundle_files < <(
         find "${KLM_STAGING}" \
             -maxdepth 1 \
             -type f \
-            -name 'klm-env-*.bundle' \
+            -name '*.bundle' \
             -print \
             | sort
     )
 
-    if [ "${#env_bundles[@]}" -eq 0 ]; then
-        echo "ERROR: No environment bundle was found in:" >&2
+    if [ "${#bundle_files[@]}" -eq 0 ]; then
+        echo "ERROR: No bundle artifacts were found in:" >&2
         echo "  ${KLM_STAGING}" >&2
         echo >&2
-        echo "Expected something like:" >&2
-        echo "  ${KLM_STAGING}/klm-env-afcgi-1.0.0.bundle" >&2
+        echo "Expected files such as:" >&2
+        echo "  onboarder-1.0.0.bundle" >&2
+        echo "  openspace-1.0.0.bundle" >&2
+        echo "  basekit-1.0.0.bundle" >&2
+        echo "  afcgi-1.0.0.bundle" >&2
         exit 1
     fi
 
-    if [ "${#env_bundles[@]}" -gt 1 ]; then
-        echo "ERROR: More than one environment bundle was found in staging:" >&2
-        printf '  %s\n' "${env_bundles[@]}" >&2
-        echo >&2
-        echo "Leave only the environment bundle you want to import in staging." >&2
-        exit 1
+    BUNDLE_IMPORT_TEMP="${KLM_STAGING}/.klm-bundle-import-$$"
+
+    rm -rf "${BUNDLE_IMPORT_TEMP}"
+    mkdir -p "${BUNDLE_IMPORT_TEMP}"
+    chmod 0755 "${BUNDLE_IMPORT_TEMP}"
+
+    if id kratos >/dev/null 2>&1; then
+        chown kratos:kratos "${BUNDLE_IMPORT_TEMP}"
     fi
 
-    env_bundle="${env_bundles[0]}"
-    temp_name=".klm-env-import-$$"
-    temp_dir="${KLM_STAGING}/${temp_name}"
-
-    rm -rf "${temp_dir}"
-    mkdir -p "${temp_dir}"
-
-    echo "Importing environment bundle:"
-    echo "  ${env_bundle}"
+    echo "Found ${#bundle_files[@]} bundle artifact(s)."
+    echo
+    echo "Validating bundles..."
     echo
 
-    # Safe extraction using only Python's standard library. Environment
-    # bundles may not contain absolute paths, parent traversal, or links.
-    top_dir="$(python3 - "${env_bundle}" "${temp_dir}" <<'PYENV'
-import os
+    # Validate every staged artifact before replacing any installed bundle.
+    for bundle_file in "${bundle_files[@]}"; do
+        item_name="item-${index}"
+        item_dir="${BUNDLE_IMPORT_TEMP}/${item_name}"
+
+        mkdir -p "${item_dir}"
+        chmod 0755 "${item_dir}"
+
+        top_dir="$(python3 - "${bundle_file}" "${item_dir}" <<'PYBUNDLE'
 import posixpath
 import sys
 import tarfile
+import warnings
 
 archive, destination = sys.argv[1], sys.argv[2]
 roots = set()
 
+# RHEL backports safer tarfile extraction behavior to Python 3.9 and emits a
+# RuntimeWarning. KLM performs its own strict member validation below.
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
 with tarfile.open(archive, "r:*") as tar:
     members = tar.getmembers()
     if not members:
-        raise SystemExit("environment bundle is empty")
+        raise SystemExit("bundle is empty")
 
     for member in members:
         name = member.name.replace("\\", "/")
         normalized = posixpath.normpath(name)
+
         if normalized in (".", ""):
             continue
+
         if normalized.startswith("/") or normalized == ".." or normalized.startswith("../"):
-            raise SystemExit("unsafe path in environment bundle: %s" % member.name)
+            raise SystemExit("unsafe path in bundle: %s" % member.name)
+
         if member.issym() or member.islnk():
-            raise SystemExit("links are not allowed in environment bundles: %s" % member.name)
+            raise SystemExit("links are not allowed in bundles: %s" % member.name)
+
         if not member.isfile() and not member.isdir():
-            raise SystemExit("special files are not allowed in environment bundles: %s" % member.name)
+            raise SystemExit("special files are not allowed in bundles: %s" % member.name)
+
         roots.add(normalized.split("/", 1)[0])
 
     if len(roots) != 1:
         raise SystemExit(
-            "environment bundle must contain exactly one top-level directory; found: %s"
+            "bundle must contain exactly one top-level directory; found: %s"
             % ", ".join(sorted(roots))
         )
 
     root = next(iter(roots))
+
     for member in members:
         tar.extract(member, destination)
 
 print(root)
-PYENV
-)" || {
-        rm -rf "${temp_dir}"
-        exit 1
-    }
+PYBUNDLE
+)"
 
-    extracted="${temp_dir}/${top_dir}"
+        # The engine runs as a non-root user. Make every extracted directory
+        # traversable and every file readable before container-side validation.
+        if id kratos >/dev/null 2>&1; then
+            chown -R kratos:kratos "${item_dir}"
+        fi
 
-    if [ ! -f "${extracted}/bundle.yml" ] || [ ! -f "${extracted}/semaphore.yml" ]; then
-        echo "ERROR: Environment bundle must contain bundle.yml and semaphore.yml." >&2
-        rm -rf "${temp_dir}"
-        exit 1
-    fi
+        find "${item_dir}" -type d -exec chmod 0755 {} \;
+        chmod -R a+rX "${item_dir}"
 
-    # The staging directory is mounted read-only in the engine container.
-    # Validate the extracted environment before replacing the installed copy.
-    podman exec -i \
-        "${KLM_CONTAINER}" \
-        /usr/local/bin/klm-engine \
-        env-validate-path \
-        "${KLM_STAGING}/${temp_name}/${top_dir}"
+        extracted="${item_dir}/${top_dir}"
 
-    target="${KLM_ENVIRONMENTS}/${top_dir}"
-    artifact_dir="${KLM_ENVIRONMENTS}/.artifacts"
+        if [ ! -f "${extracted}/bundle.yml" ] || [ ! -f "${extracted}/semaphore.yml" ]; then
+            echo "ERROR: $(basename "${bundle_file}") must contain bundle.yml and semaphore.yml." >&2
+            exit 1
+        fi
 
-    mkdir -p "${KLM_ENVIRONMENTS}" "${artifact_dir}"
-    rm -rf "${target}"
-    mv "${extracted}" "${target}"
-    rm -rf "${temp_dir}"
+        metadata="$(
+            podman exec -i \
+                "${KLM_CONTAINER}" \
+                /usr/local/bin/klm-engine \
+                bundle-validate-path \
+                "${KLM_STAGING}/$(basename "${BUNDLE_IMPORT_TEMP}")/${item_name}/${top_dir}"
+        )"
 
-    # Keep only the latest imported archive for this environment.
-    rm -f "${artifact_dir}/klm-env-${top_dir}-"*.bundle 2>/dev/null || true
-    mv "${env_bundle}" "${artifact_dir}/$(basename "${env_bundle}")"
+        IFS=$'\t' read -r name version bundle_type <<< "${metadata}"
 
-    if id kratos >/dev/null 2>&1; then
-        chown -R kratos:kratos "${target}" "${artifact_dir}"
-    fi
+        if [ -z "${name}" ] || [ -z "${version}" ] || [ -z "${bundle_type}" ]; then
+            echo "ERROR: Could not read bundle metadata from $(basename "${bundle_file}")." >&2
+            exit 1
+        fi
 
-    find "${target}" -type d -exec chmod 0755 {} \;
-    find "${target}" -type f -exec chmod 0644 {} \;
+        if [ -n "${staged_names[${name}]+x}" ]; then
+            echo "ERROR: More than one staged artifact declares bundle name '${name}'." >&2
+            exit 1
+        fi
+        staged_names["${name}"]=1
+
+        case "${bundle_type}" in
+            capability|architecture)
+                if [ -e "${KLM_ENVIRONMENTS}/${name}" ]; then
+                    echo "ERROR: Bundle '${name}' is already installed as an environment." >&2
+                    exit 1
+                fi
+                ;;
+
+            environment)
+                if [ -e "${KLM_BUNDLES}/${name}" ]; then
+                    echo "ERROR: Bundle '${name}' is already installed as a capability/architecture bundle." >&2
+                    exit 1
+                fi
+                ;;
+
+            *)
+                echo "ERROR: Unsupported bundle type '${bundle_type}' for '${name}'." >&2
+                exit 1
+                ;;
+        esac
+
+        printf "  OK  %-15s %-10s %s\n" \
+            "${name}" \
+            "${version}" \
+            "${bundle_type}"
+
+        records+=(
+            "${bundle_file}"$'\t'"${item_name}"$'\t'"${top_dir}"$'\t'"${name}"$'\t'"${version}"$'\t'"${bundle_type}"
+        )
+
+        index=$((index + 1))
+    done
 
     echo
-    echo "Environment import complete."
-    echo "Installed: ${target}"
+    echo "Installing bundles..."
     echo
-    echo "Next, select a system, for example:"
-    echo "  klm env skct2"
+
+    for record in "${records[@]}"; do
+        IFS=$'\t' read -r \
+            bundle_file \
+            item_name \
+            top_dir \
+            name \
+            version \
+            bundle_type \
+            <<< "${record}"
+
+        if [ "${bundle_type}" = "environment" ]; then
+            target="${KLM_ENVIRONMENTS}/${name}"
+            artifact_dir="${KLM_ENVIRONMENTS}/.artifacts"
+        else
+            target="${KLM_BUNDLES}/${name}"
+            artifact_dir="${KLM_BUNDLES}/.artifacts"
+        fi
+
+        mkdir -p "${artifact_dir}"
+
+        rm -rf "${target}"
+        mv \
+            "${BUNDLE_IMPORT_TEMP}/${item_name}/${top_dir}" \
+            "${target}"
+
+        # Retain only the current imported artifact for this bundle name.
+        rm -f \
+            "${artifact_dir}/${name}-"*.bundle \
+            "${artifact_dir}/klm-env-${name}-"*.bundle \
+            2>/dev/null || true
+
+        mv \
+            "${bundle_file}" \
+            "${artifact_dir}/$(basename "${bundle_file}")"
+
+        if id kratos >/dev/null 2>&1; then
+            chown -R kratos:kratos "${target}" "${artifact_dir}"
+        fi
+
+        find "${target}" -type d -exec chmod 0755 {} \;
+        chmod -R a+rX "${target}"
+        chmod 0644 "${artifact_dir}/$(basename "${bundle_file}")"
+
+        printf "  %-15s -> %s\n" "${name}" "${target}"
+    done
+
+    rm -rf "${BUNDLE_IMPORT_TEMP}"
+    BUNDLE_IMPORT_TEMP=""
+
+    echo
+    echo "Bundle import complete."
+    echo
+    echo "Run:"
+    echo "  klm bundles list"
+    echo "  klm bundles validate"
 }
 
 
@@ -590,9 +742,19 @@ case "${1:-}" in
         esac
         ;;
 
+    bundles)
+        if [ "${2:-}" = "import" ]; then
+            import_bundles
+        else
+            run_engine_command "$@"
+        fi
+        ;;
+
     env)
         if [ "${2:-}" = "import" ]; then
-            import_environment
+            echo "NOTE: 'klm env import' has been replaced by 'klm bundles import'."
+            echo
+            import_bundles
         else
             run_engine_command "$@"
         fi

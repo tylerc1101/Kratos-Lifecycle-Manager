@@ -41,7 +41,7 @@ def validate_environment_path(path):
     bundle = bundle_loader.load_bundle(path, os.path.basename(path))
     if bundle.bundle_type != "environment":
         raise EnvironmentSelectionError(
-            "Bundle '%s' has type '%s'; klm env import requires type: environment"
+            "Bundle '%s' has type '%s'; bundle path must have type: environment"
             % (bundle.name, bundle.bundle_type)
         )
     return bundle
