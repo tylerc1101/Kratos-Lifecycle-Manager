@@ -1,19 +1,5 @@
-executables: {}
-
-required_files:
-  - manifest.yml
+# Optional build settings. The folder name is the bundle name.
+version: "3.8.0"
+required:
   - Taskfile.yml
-
-required_dirs:
   - actions
-    #  - images
-
-include_files: {}
-
-exclude:
-  - build-manifest.yml
-  - .git
-  - .gitignore
-  - "*.bundle"
-  - tmp
-  - logs

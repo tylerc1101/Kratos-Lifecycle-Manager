@@ -1,0 +1,54 @@
+all:
+  vars:
+    env_name: skct2
+    domain_name: base-kit-2.kratos
+
+    klm_home: /opt/openspace
+
+    ntp_servers:
+      - 192.168.2.100
+
+    repo:
+      - kratos.repo
+
+    wan_dns_servers:
+      - 10.243.25.50
+      - 10.243.25.53
+
+    opnsense:
+      wan_ip: 10.243.77.222
+      gateway: 10.243.76.1
+      cidr: 23
+      lan_ip: 192.168.2.1
+
+    ssh_key: rancher_ssh_key
+
+  children:
+    klm_host:
+      hosts:
+        mgmt-kvm:
+          ansible_host: 10.243.77.212
+    
+    vms:
+      children:
+        mcm:
+          hosts:
+            mcm1:
+              ansible_host: 192.168.2.8
+              libvirt_memory_mb: 16384
+              libvirt_vcpus: 8
+    
+        osms:
+          hosts:
+            osms1:
+              ansible_host: 192.168.2.9
+              libvirt_memory_mb: 32768
+              libvirt_vcpus: 16
+    
+    osdc:
+      hosts:
+        osdc1:
+          ansible_host: 192.168.2.16
+    
+        osdc2:
+          ansible_host: 192.168.2.17

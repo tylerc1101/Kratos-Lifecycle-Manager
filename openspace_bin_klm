@@ -1,0 +1,605 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+KLM_CONTAINER="klm-engine"
+
+KLM_ROOT="/opt/openspace"
+KLM_BUNDLES="${KLM_ROOT}/bundles"
+KLM_CONFIG="${KLM_ROOT}/config"
+KLM_ENGINE="${KLM_ROOT}/engine"
+KLM_ENVIRONMENTS="${KLM_ROOT}/environments"
+KLM_SECRETS="${KLM_ROOT}/secrets"
+KLM_STAGING="${KLM_ROOT}/staging"
+
+KLM_STATE="${KLM_ROOT}/state"
+
+
+usage() {
+    echo "Usage:"
+    echo "  klm start"
+    echo "  klm stop"
+    echo "  klm restart"
+    echo "  klm status"
+    echo "  klm logs"
+    echo "  klm shell"
+    echo
+    echo "  klm engine import"
+    echo "  klm engine list"
+    echo
+    echo "  klm env import"
+    echo "  klm env <system>"
+    echo "  klm env"
+    echo
+    echo "  klm version"
+    echo "  klm doctor"
+    echo "  klm bundles list"
+    echo "  klm bundles validate"
+    echo "  klm reconcile"
+    echo "  klm reconcile --dry-run"
+}
+
+
+container_exists() {
+    podman container exists "${KLM_CONTAINER}"
+}
+
+
+container_running() {
+    if ! container_exists; then
+        return 1
+    fi
+
+    podman inspect \
+        --format '{{.State.Running}}' \
+        "${KLM_CONTAINER}" | grep -q '^true$'
+}
+
+
+get_engine_images() {
+    podman images \
+        --format '{{.Repository}}:{{.Tag}}' \
+        | grep -E '(^|/)klm-engine:[^[:space:]]+$' \
+        | grep -v ':<none>$' \
+        || true
+}
+
+
+get_engine_image() {
+    local images=()
+
+    mapfile -t images < <(get_engine_images)
+
+    if [ "${#images[@]}" -eq 0 ]; then
+        echo "ERROR: No KLM engine image is installed." >&2
+        return 1
+    fi
+
+    if [ "${#images[@]}" -gt 1 ]; then
+        echo "ERROR: More than one KLM engine image is installed:" >&2
+        printf '  %s\n' "${images[@]}" >&2
+        echo >&2
+        echo "KLM expects only one engine image at a time." >&2
+        return 1
+    fi
+
+    echo "${images[0]}"
+}
+
+
+start_klm() {
+    local engine_image
+
+    if container_running; then
+        echo "KLM is already running."
+        return
+    fi
+
+    if container_exists; then
+        echo "Starting existing KLM container..."
+        podman start "${KLM_CONTAINER}"
+        return
+    fi
+
+    engine_image="$(get_engine_image)"
+
+    echo "Creating KLM container..."
+    echo "Image:"
+    echo "  ${engine_image}"
+    echo
+
+    podman run -d \
+        --name "${KLM_CONTAINER}" \
+        --network host \
+        --restart=always \
+        -v "${KLM_BUNDLES}:${KLM_BUNDLES}:ro,z" \
+        -v "${KLM_CONFIG}:${KLM_CONFIG}:ro,Z" \
+        -v "${KLM_ENVIRONMENTS}:${KLM_ENVIRONMENTS}:ro,Z" \
+        -v "${KLM_SECRETS}:${KLM_SECRETS}:ro,Z" \
+        -v "${KLM_STAGING}:${KLM_STAGING}:ro,z" \
+        -v "${KLM_STATE}:${KLM_STATE}:Z" \
+        "${engine_image}"
+
+    echo
+    echo "KLM started."
+}
+
+
+stop_klm() {
+    if ! container_exists; then
+        echo "KLM is not deployed."
+        return
+    fi
+
+    if ! container_running; then
+        echo "KLM is already stopped."
+        return
+    fi
+
+    echo "Stopping KLM..."
+    podman stop "${KLM_CONTAINER}"
+
+    echo "KLM stopped."
+}
+
+
+restart_klm() {
+    if container_exists; then
+        echo "Removing existing KLM container..."
+        podman rm -f "${KLM_CONTAINER}"
+    fi
+
+    start_klm
+}
+
+
+status_klm() {
+    local images=()
+
+    mapfile -t images < <(get_engine_images)
+
+    echo "KLM engine:"
+    echo
+
+    if [ "${#images[@]}" -eq 0 ]; then
+        echo "  Image: not imported"
+    else
+        printf '  Image: %s\n' "${images[@]}"
+    fi
+
+    echo
+
+    if ! container_exists; then
+        echo "KLM container: not deployed"
+        return
+    fi
+
+    podman ps -a \
+        --filter "name=${KLM_CONTAINER}" \
+        --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+}
+
+
+logs_klm() {
+    if ! container_exists; then
+        echo "ERROR: KLM is not deployed."
+        exit 1
+    fi
+
+    podman logs -f "${KLM_CONTAINER}"
+}
+
+
+shell_klm() {
+    if ! container_running; then
+        echo "ERROR: KLM is not running."
+        exit 1
+    fi
+
+    podman exec -it "${KLM_CONTAINER}" /bin/bash
+}
+
+run_engine_command() {
+    if ! container_running; then
+        echo "ERROR: KLM is not running."
+        exit 1
+    fi
+
+    podman exec -i \
+        "${KLM_CONTAINER}" \
+        /usr/local/bin/klm-engine "$@"
+}
+
+backup_semaphore_database() {
+    local database="${KLM_STATE}/semaphore/database.sqlite"
+    local backup_root="${KLM_STATE}/backups"
+    local backup_dir
+
+    if [ ! -f "${database}" ]; then
+        return
+    fi
+
+    backup_dir="${backup_root}/$(date +%Y%m%d-%H%M%S)"
+
+    echo "Backing up Semaphore database:"
+    echo "  ${backup_dir}"
+    echo
+
+    mkdir -p "${backup_dir}"
+
+    cp -a "${database}" "${backup_dir}/"
+
+    if [ -f "${database}-wal" ]; then
+        cp -a "${database}-wal" "${backup_dir}/"
+    fi
+
+    if [ -f "${database}-shm" ]; then
+        cp -a "${database}-shm" "${backup_dir}/"
+    fi
+
+    # Keep backup permissions private while still allowing the runtime UID
+    # to access them if recovery is needed inside the container.
+    chown -R 1000:1000 "${backup_dir}"
+    chmod 0700 "${backup_dir}"
+    find "${backup_dir}" -type f -exec chmod 0600 {} \;
+}
+
+
+import_engine() {
+    local engine_tars=()
+    local engine_tar
+    local load_output
+    local loaded_image
+    local old_images=()
+
+    mapfile -t engine_tars < <(
+        find "${KLM_STAGING}" \
+            -maxdepth 1 \
+            -type f \
+            -name 'klm-engine-*.tar' \
+            -print \
+            | sort
+    )
+
+    if [ "${#engine_tars[@]}" -eq 0 ]; then
+        echo "ERROR: No KLM engine tar was found in:"
+        echo "  ${KLM_STAGING}"
+        echo
+        echo "Expected something like:"
+        echo "  ${KLM_STAGING}/klm-engine-1.0.0.tar"
+        exit 1
+    fi
+
+    if [ "${#engine_tars[@]}" -gt 1 ]; then
+        echo "ERROR: More than one KLM engine tar was found in staging:"
+        printf '  %s\n' "${engine_tars[@]}"
+        echo
+        echo "Leave only the engine you want to import in staging."
+        exit 1
+    fi
+
+    engine_tar="${engine_tars[0]}"
+
+    echo "Importing KLM engine:"
+    echo "  ${engine_tar}"
+    echo
+
+    load_output="$(podman load -i "${engine_tar}" 2>&1)"
+
+    echo "${load_output}"
+    echo
+
+    loaded_image="$(
+        printf '%s\n' "${load_output}" \
+            | sed -n 's/^Loaded image: //p' \
+            | tail -n 1
+    )"
+
+    if [ -z "${loaded_image}" ]; then
+        echo "ERROR: Podman loaded the archive, but KLM could not determine"
+        echo "the image name from the load output."
+        exit 1
+    fi
+
+    if ! printf '%s\n' "${loaded_image}" \
+        | grep -Eq '(^|/)klm-engine:[^[:space:]]+$'; then
+
+        echo "ERROR: The imported image does not appear to be a KLM engine."
+        echo
+        echo "Loaded image:"
+        echo "  ${loaded_image}"
+        exit 1
+    fi
+
+    if ! podman image exists "${loaded_image}"; then
+        echo "ERROR: Imported image could not be found:"
+        echo "  ${loaded_image}"
+        exit 1
+    fi
+
+    echo "Detected engine image:"
+    echo "  ${loaded_image}"
+    echo
+
+    # If an older KLM container exists, remove it only after the new
+    # engine has loaded successfully.
+    if container_exists; then
+        echo "Removing existing KLM container..."
+        podman rm -f "${KLM_CONTAINER}"
+        echo
+    fi
+
+    # Semaphore is stopped at this point, so copying SQLite + WAL/SHM is
+    # consistent enough for a simple engine-import recovery point.
+    backup_semaphore_database
+
+    # Remove older KLM engine images.
+    mapfile -t old_images < <(get_engine_images)
+
+    for image in "${old_images[@]}"; do
+        if [ "${image}" != "${loaded_image}" ]; then
+            echo "Removing previous engine image:"
+            echo "  ${image}"
+
+            podman image rm "${image}"
+        fi
+    done
+
+    # Move the newly imported tar into the engine directory.
+    # Only the current engine tar is retained.
+    mv "${engine_tar}" "${KLM_ENGINE}/.klm-engine-import.tar"
+
+    rm -f "${KLM_ENGINE}"/*.tar
+
+    mv \
+        "${KLM_ENGINE}/.klm-engine-import.tar" \
+        "${KLM_ENGINE}/$(basename "${engine_tar}")"
+
+    echo
+    echo "KLM engine import complete."
+    echo
+    echo "Engine image:"
+    echo "  ${loaded_image}"
+    echo
+    echo "Stored engine artifact:"
+    echo "  ${KLM_ENGINE}/$(basename "${engine_tar}")"
+    echo
+    echo "KLM is stopped after import."
+    echo "Run:"
+    echo "  klm start"
+}
+
+
+list_engines() {
+    local images=()
+
+    mapfile -t images < <(get_engine_images)
+
+    echo "KLM engine image:"
+
+    if [ "${#images[@]}" -eq 0 ]; then
+        echo "  None"
+    else
+        printf '  %s\n' "${images[@]}"
+    fi
+
+    echo
+    echo "Stored engine artifact:"
+
+    if compgen -G "${KLM_ENGINE}/*.tar" > /dev/null; then
+        ls -lh "${KLM_ENGINE}"/*.tar
+    else
+        echo "  None"
+    fi
+
+    echo
+    echo "Staged engine artifact:"
+
+    if compgen -G "${KLM_STAGING}/klm-engine-*.tar" > /dev/null; then
+        ls -lh "${KLM_STAGING}"/klm-engine-*.tar
+    else
+        echo "  None"
+    fi
+}
+
+
+import_environment() {
+    local env_bundles=()
+    local env_bundle
+    local temp_name
+    local temp_dir
+    local top_dir
+    local extracted
+    local target
+    local artifact_dir
+
+    if ! container_running; then
+        echo "ERROR: KLM must be running before importing an environment." >&2
+        echo "Run: klm start" >&2
+        exit 1
+    fi
+
+    mapfile -t env_bundles < <(
+        find "${KLM_STAGING}" \
+            -maxdepth 1 \
+            -type f \
+            -name 'klm-env-*.bundle' \
+            -print \
+            | sort
+    )
+
+    if [ "${#env_bundles[@]}" -eq 0 ]; then
+        echo "ERROR: No environment bundle was found in:" >&2
+        echo "  ${KLM_STAGING}" >&2
+        echo >&2
+        echo "Expected something like:" >&2
+        echo "  ${KLM_STAGING}/klm-env-afcgi-1.0.0.bundle" >&2
+        exit 1
+    fi
+
+    if [ "${#env_bundles[@]}" -gt 1 ]; then
+        echo "ERROR: More than one environment bundle was found in staging:" >&2
+        printf '  %s\n' "${env_bundles[@]}" >&2
+        echo >&2
+        echo "Leave only the environment bundle you want to import in staging." >&2
+        exit 1
+    fi
+
+    env_bundle="${env_bundles[0]}"
+    temp_name=".klm-env-import-$$"
+    temp_dir="${KLM_STAGING}/${temp_name}"
+
+    rm -rf "${temp_dir}"
+    mkdir -p "${temp_dir}"
+
+    echo "Importing environment bundle:"
+    echo "  ${env_bundle}"
+    echo
+
+    # Safe extraction using only Python's standard library. Environment
+    # bundles may not contain absolute paths, parent traversal, or links.
+    top_dir="$(python3 - "${env_bundle}" "${temp_dir}" <<'PYENV'
+import os
+import posixpath
+import sys
+import tarfile
+
+archive, destination = sys.argv[1], sys.argv[2]
+roots = set()
+
+with tarfile.open(archive, "r:*") as tar:
+    members = tar.getmembers()
+    if not members:
+        raise SystemExit("environment bundle is empty")
+
+    for member in members:
+        name = member.name.replace("\\", "/")
+        normalized = posixpath.normpath(name)
+        if normalized in (".", ""):
+            continue
+        if normalized.startswith("/") or normalized == ".." or normalized.startswith("../"):
+            raise SystemExit("unsafe path in environment bundle: %s" % member.name)
+        if member.issym() or member.islnk():
+            raise SystemExit("links are not allowed in environment bundles: %s" % member.name)
+        if not member.isfile() and not member.isdir():
+            raise SystemExit("special files are not allowed in environment bundles: %s" % member.name)
+        roots.add(normalized.split("/", 1)[0])
+
+    if len(roots) != 1:
+        raise SystemExit(
+            "environment bundle must contain exactly one top-level directory; found: %s"
+            % ", ".join(sorted(roots))
+        )
+
+    root = next(iter(roots))
+    for member in members:
+        tar.extract(member, destination)
+
+print(root)
+PYENV
+)" || {
+        rm -rf "${temp_dir}"
+        exit 1
+    }
+
+    extracted="${temp_dir}/${top_dir}"
+
+    if [ ! -f "${extracted}/bundle.yml" ] || [ ! -f "${extracted}/semaphore.yml" ]; then
+        echo "ERROR: Environment bundle must contain bundle.yml and semaphore.yml." >&2
+        rm -rf "${temp_dir}"
+        exit 1
+    fi
+
+    # The staging directory is mounted read-only in the engine container.
+    # Validate the extracted environment before replacing the installed copy.
+    podman exec -i \
+        "${KLM_CONTAINER}" \
+        /usr/local/bin/klm-engine \
+        env-validate-path \
+        "${KLM_STAGING}/${temp_name}/${top_dir}"
+
+    target="${KLM_ENVIRONMENTS}/${top_dir}"
+    artifact_dir="${KLM_ENVIRONMENTS}/.artifacts"
+
+    mkdir -p "${KLM_ENVIRONMENTS}" "${artifact_dir}"
+    rm -rf "${target}"
+    mv "${extracted}" "${target}"
+    rm -rf "${temp_dir}"
+
+    # Keep only the latest imported archive for this environment.
+    rm -f "${artifact_dir}/klm-env-${top_dir}-"*.bundle 2>/dev/null || true
+    mv "${env_bundle}" "${artifact_dir}/$(basename "${env_bundle}")"
+
+    if id kratos >/dev/null 2>&1; then
+        chown -R kratos:kratos "${target}" "${artifact_dir}"
+    fi
+
+    find "${target}" -type d -exec chmod 0755 {} \;
+    find "${target}" -type f -exec chmod 0644 {} \;
+
+    echo
+    echo "Environment import complete."
+    echo "Installed: ${target}"
+    echo
+    echo "Next, select a system, for example:"
+    echo "  klm env skct2"
+}
+
+
+case "${1:-}" in
+
+    start)
+        start_klm
+        ;;
+
+    stop)
+        stop_klm
+        ;;
+
+    restart)
+        restart_klm
+        ;;
+
+    status)
+        status_klm
+        ;;
+
+    logs)
+        logs_klm
+        ;;
+
+    shell)
+        shell_klm
+        ;;
+
+    engine)
+        case "${2:-}" in
+
+            import)
+                import_engine
+                ;;
+
+            list)
+                list_engines
+                ;;
+
+            *)
+                usage
+                exit 1
+                ;;
+
+        esac
+        ;;
+
+    env)
+        if [ "${2:-}" = "import" ]; then
+            import_environment
+        else
+            run_engine_command "$@"
+        fi
+        ;;
+
+    *)
+        run_engine_command "$@"
+        ;;
+
+esac

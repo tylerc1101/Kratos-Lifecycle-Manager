@@ -1,0 +1,5 @@
+name: onboarder
+version: 1.0.0
+type: capability
+enabled: true
+description: Reusable host onboarding automation

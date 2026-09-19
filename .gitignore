@@ -1,65 +1,14 @@
-# =========================================
-# KLM Generated Bundles
-# =========================================
-
-*.bundle
-*.tgz
-*.tar
-*.tar.gz
-
-# =========================================
-# Bundle Build Artifacts
-# =========================================
-
+# Generated artifacts
 dist/
-tmp/
-build/task
-.cache/
-
-# =========================================
-# Python
-# =========================================
-
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# =========================================
-# IDE
-# =========================================
-
-.vscode/
-.idea/
-
-# =========================================
-# Logs
-# =========================================
-
+.venv/
+.pytest_cache/
 *.log
-
-# =========================================
-# Local Testing
-# =========================================
-
-test/
-testing/
-sandbox/
-
-# =========================================
-# Large Offline Images
-# =========================================
-
-**/images/*
-!**/images/.gitkeep
-# Generated extracted images
-**/*.tar
-**/*.tar.gz
-**/*.oci
-
-# =========================================
-# Runtime Files
-# =========================================
-
 .env
 .envrc
+
+# Keep large payloads out of normal Git commits.
+# They are still included in build archives when present locally.
+**/images/*
+!**/images/.gitkeep

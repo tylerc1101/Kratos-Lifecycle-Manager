@@ -1,0 +1,159 @@
+FROM platform-one-ironbank-docker-remote.bits.devops.kratosdefense.com/ironbank/redhat/ubi/ubi9:9.8
+
+ARG EXTRA_PACKAGES=""
+
+USER root
+
+
+# ---------------------------------------------------------------------------
+# Repositories
+# ---------------------------------------------------------------------------
+
+COPY engine/repos/ /etc/yum.repos.d/
+
+# ---------------------------------------------------------------------------
+# KLM Engine dependencies
+# ---------------------------------------------------------------------------
+
+RUN dnf -y --allowerasing --nogpgcheck install \
+        ansible \
+        bash \
+        coreutils \
+        findutils \
+        grep \
+        sed \
+        gawk \
+        tar \
+        gzip \
+        unzip \
+        shadow-utils \
+        sudo \
+        which \
+        openssh-clients \
+        rsync \
+        curl \
+        jq \
+        git \
+        python3 \
+        python3-pip \
+        python3-pyyaml \
+        openssl \
+        libvirt-client \
+        virt-install \
+        qemu-img \
+        podman \
+        skopeo \
+        util-linux \
+        procps-ng \
+        iproute \
+        iputils \
+        NetworkManager \
+        nmstate \
+        lvm2 \
+        parted \
+        e2fsprogs \
+        xfsprogs \
+        policycoreutils \
+        policycoreutils-python-utils \
+        ${EXTRA_PACKAGES} \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+
+# ---------------------------------------------------------------------------
+# KLM binaries
+#
+# This directory can contain:
+#   semaphore
+#   klm-engine
+#   kubectl
+#   helm
+#   other KLM-managed binaries
+# ---------------------------------------------------------------------------
+
+COPY engine/bin/ /usr/local/bin/
+
+RUN chmod 0755 /usr/local/bin/*
+
+
+#----------------------------------------------------------------------------
+# KLM scripts
+#----------------------------------------------------------------------------
+
+COPY engine/klm /opt/klm
+
+# ---------------------------------------------------------------------------
+# Semaphore configuration
+# ---------------------------------------------------------------------------
+
+RUN mkdir -p /etc/klm
+
+COPY engine/config.json /etc/klm/config.json
+
+
+# ---------------------------------------------------------------------------
+# Runtime user/group
+# ---------------------------------------------------------------------------
+
+RUN groupadd \
+        --gid 1000 \
+        semaphore \
+    && useradd \
+        --uid 1000 \
+        --gid semaphore \
+        --create-home \
+        --shell /bin/bash \
+        semaphore
+
+
+# ---------------------------------------------------------------------------
+# Runtime directories
+#
+# Persistent runtime state is mounted from the host at /opt/openspace/state.
+# Only image-local application and temporary directories are created here.
+# ---------------------------------------------------------------------------
+
+RUN mkdir -p \
+        /tmp/klm \
+        /opt/klm \
+    && chown -R semaphore:semaphore \
+        /tmp/klm \
+        /opt/klm \
+    && chown root:semaphore /etc/klm/config.json \
+    && chmod 0640 /etc/klm/config.json
+
+
+# ---------------------------------------------------------------------------
+# Default Semaphore administrator
+#
+# We can move the password to a secret later. For development the current
+# value is fine.
+# ---------------------------------------------------------------------------
+
+ENV SEMAPHORE_ADMIN="admin" \
+    SEMAPHORE_ADMIN_PASSWORD="kratos" \
+    SEMAPHORE_ADMIN_NAME="KLM Admin" \
+    SEMAPHORE_ADMIN_EMAIL="admin@localhost" \
+    SEMAPHORE_CONFIG_PATH="/etc/klm/config.json"
+
+
+# ---------------------------------------------------------------------------
+# KLM startup
+# ---------------------------------------------------------------------------
+
+COPY engine/entrypoint.sh /usr/local/bin/klm-entrypoint
+
+RUN chmod 0755 /usr/local/bin/klm-entrypoint
+
+
+# ---------------------------------------------------------------------------
+# Runtime
+# ---------------------------------------------------------------------------
+
+USER semaphore
+
+WORKDIR /opt/klm
+
+EXPOSE 3000
+
+ENTRYPOINT ["/usr/local/bin/klm-entrypoint"]

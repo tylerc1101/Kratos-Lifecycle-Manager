@@ -1,0 +1,8 @@
+---
+- name: Example OpenSpace validation
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show validation target
+      ansible.builtin.debug:
+        msg: "Validating OpenSpace on {{ inventory_hostname }}"

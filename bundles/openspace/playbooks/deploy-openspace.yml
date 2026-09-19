@@ -1,0 +1,8 @@
+---
+- name: Example OpenSpace deployment
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show deployment target
+      ansible.builtin.debug:
+        msg: "Deploying OpenSpace automation to {{ inventory_hostname }}"

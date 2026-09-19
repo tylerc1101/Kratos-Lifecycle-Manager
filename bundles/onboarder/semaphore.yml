@@ -1,0 +1,20 @@
+repositories:
+  - name: Onboarder
+    url: file:///opt/openspace/bundles/onboarder
+    branch: main
+
+views:
+  - name: Onboarder Tools
+
+templates:
+  - name: Ping Host
+    description: Basic connectivity check. Operator chooses the inventory at launch.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/ping.yml
+
+  - name: Onboard System
+    description: Example reusable onboarding task. Operator chooses the inventory at launch.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/onboard-system.yml

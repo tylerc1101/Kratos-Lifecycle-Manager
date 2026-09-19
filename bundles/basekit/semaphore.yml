@@ -1,0 +1,45 @@
+repositories:
+  - name: BaseKit
+    url: file:///opt/openspace/bundles/basekit
+    branch: main
+
+views:
+  - name: BaseKit
+
+templates:
+  - name: BaseKit Precheck
+    description: Example BaseKit architecture precheck. Operator chooses the inventory at launch.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/precheck.yml
+
+workflows:
+  - name: Build BaseKit
+    description: Example architecture workflow composed from multiple required bundles
+    view: BaseKit
+    nodes:
+      - id: precheck
+        type: task
+        template: BaseKit Precheck
+        x: 0
+        y: 0
+
+      - id: onboard
+        type: task
+        template: onboarder::Onboard System
+        x: 300
+        y: 0
+
+      - id: openspace
+        type: task
+        template: openspace::Deploy OpenSpace
+        x: 600
+        y: 0
+
+    edges:
+      - from: precheck
+        to: onboard
+        condition: on_success
+      - from: onboard
+        to: openspace
+        condition: on_success

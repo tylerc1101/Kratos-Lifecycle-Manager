@@ -1,0 +1,49 @@
+---
+- name: Bootstrap mgmt-kvm server
+  hosts: klm_host
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Set system hostname from inventory
+      hostname:
+        name: "{{ inventory_hostname }}.{{ domain_name }}"
+
+    - name: Install required packages
+      yum:
+        name:
+          - "@Development Tools"
+          - "@Virtualization Platform"
+          - "@Container Management"
+          - "@Headless Management"
+          - gcc
+          - openssl-devel
+          - bzip2-devel
+          - libffi-devel
+          - zlib-devel
+          - xz-devel
+          - readline-devel
+          - sqlite-devel
+          - wget
+          - virt-install
+          - cockpit-machines
+          - libcdio
+          - libguestfs
+        state: present
+        disable_gpg_check: yes
+
+    - name: Start/Enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - libvirtd
+        - cockpit.socket
+
+    - name: Create sudoers entry for user
+      copy:
+        dest: /etc/sudoers.d/{{ ansible_user }}
+        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: "visudo -cf %s"

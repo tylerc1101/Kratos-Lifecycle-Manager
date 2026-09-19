@@ -1,0 +1,20 @@
+repositories:
+  - name: OpenSpace
+    url: file:///opt/openspace/bundles/openspace
+    branch: main
+
+views:
+  - name: OpenSpace Tools
+
+templates:
+  - name: Deploy OpenSpace
+    description: Example reusable OpenSpace deployment task. Operator chooses the inventory at launch.
+    view: OpenSpace Tools
+    repository: OpenSpace
+    playbook: playbooks/deploy-openspace.yml
+
+  - name: Validate OpenSpace
+    description: Example reusable OpenSpace validation task. Operator chooses the inventory at launch.
+    view: OpenSpace Tools
+    repository: OpenSpace
+    playbook: playbooks/validate-openspace.yml

@@ -1,0 +1,8 @@
+---
+- name: Example BaseKit precheck
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show BaseKit target
+      ansible.builtin.debug:
+        msg: "BaseKit precheck for {{ inventory_hostname }}"

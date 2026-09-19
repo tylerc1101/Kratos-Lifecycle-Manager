@@ -1,0 +1,10 @@
+name: basekit
+version: 1.0.0
+type: architecture
+enabled: true
+description: Example architecture bundle that composes Onboarder and OpenSpace capabilities
+requires:
+  - name: onboarder
+    version: 1.0.0
+  - name: openspace
+    version: 1.0.0

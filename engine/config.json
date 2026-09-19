@@ -1,0 +1,24 @@
+{
+  "sqlite": {
+    "host": "/opt/openspace/state/semaphore/database.sqlite"
+  },
+
+  "dialect": "sqlite",
+
+  "interface": "0.0.0.0",
+  "port": ":3000",
+
+  "tmp_path": "/tmp/klm",
+
+  "git_client": "cmd_git",
+
+  "tls": {
+    "enabled": true,
+    "cert_file": "/opt/openspace/state/tls/klm.crt",
+    "key_file": "/opt/openspace/state/tls/klm.key"
+  },
+
+  "schedule": {
+    "timezone": "UTC"
+  }
+}

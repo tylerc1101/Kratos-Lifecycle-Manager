@@ -1,11 +1,11 @@
 ---
 - name: Configure RKE2 host prerequisites
-  hosts: all
+  hosts: mcm,osms,osdc
   become: true
   gather_facts: true
 
   vars:
-    bundles_dir: "{{ klm.home }}/env/{{ env_name }}/bundles/onboarder"
+    bundles_dir: "{{ klm.home }}/bundles/onboarder"
     
     selinux_mode: enforcing
 

@@ -1,0 +1,27 @@
+/opt/openspace gets created
+need bundles ready
+Run from env bundle env_prep.yml
+run basekit bootstrap-mgmt-kvm.yml
+configure-opnsense.yml
+    env script to change farg from 0 to 1
+    Need to change the setting for users to connect their laptop
+copy-opnsense-config.yml
+install_opnsense.sh
+deploy-vms.yml
+
+run env_prep.yml on all nodes (hostname, repos setup, /etc/resolv, chrony)
+
+onboarder steps:
+node-prep.yml
+    env osdc nic driver install
+    env playbook, change /etc/resolv back to br-mgmt
+prep-container.yml
+    setup config directory in /opt/openspace/onboarder_config
+    configure files in directory (onboarder and downstream)
+    create ssh_key and distribute
+    start onboarder with directory mounted /docker-workspace/config/{{ env }}
+run makes (Not playbook)
+    ??? maybe bash script using ssh_key to run a podman exec command?
+deploy downstream cluster
+    manual step? has a question that needs to be answered and cant with semaphore
+deploy openspace

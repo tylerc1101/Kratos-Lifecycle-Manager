@@ -1,0 +1,199 @@
+---
+- name: Create requested OpenSpace VMs
+  hosts: vms
+  gather_facts: false
+  become: true
+  connection: local
+  serial: 1
+
+  vars:
+    images_dir: /var/lib/libvirt/config/images
+
+    mgmt_cidr: "24"
+    mgmt_gateway: "192.168.2.1"
+    mgmt_dns_servers: "192.168.2.1"
+
+    vm_name: "{{ inventory_hostname }}"
+    vm_memory: "{{ libvirt_memory_mb }}"
+    vm_vcpus: "{{ libvirt_vcpus }}"
+    vm_backing_store: "/var/lib/libvirt/config/images/RHEL9_8_26Q3.qcow2"
+    vm_os_variant: "rhel9.8"
+    vm_network_bridge: "br-mgmt"
+    vm_mgmt_ip: "{{ ansible_host }}"
+
+    vm_ifcfg_dir: "/tmp/{{ vm_name }}-network"
+    vm_ifcfg_file: "{{ vm_ifcfg_dir }}/ifcfg-enp1s0"
+
+  tasks:
+    - name: Check if backing image exists
+      ansible.builtin.stat:
+        path: "{{ vm_backing_store }}"
+      register: backing_image_stat
+      failed_when: not backing_image_stat.stat.exists
+
+    - name: Get list of existing VMs
+      ansible.builtin.command: virsh list --all --name
+      register: existing_vms
+      changed_when: false
+
+    - name: Check if VM already exists
+      ansible.builtin.set_fact:
+        vm_exists: "{{ vm_name in existing_vms.stdout_lines }}"
+
+    - name: Create VM XML
+      ansible.builtin.command:
+        cmd: >
+          virt-install
+          --connect qemu:///system
+          --virt-type kvm
+          --name {{ vm_name }}
+          --memory {{ vm_memory }}
+          --vcpus {{ vm_vcpus }}
+          --cpu host-passthrough
+          --disk size={{ vm_disk_size }},backing_store="{{ vm_backing_store }}"
+          --os-variant {{ vm_os_variant }}
+          --network bridge={{ vm_network_bridge }},model=virtio
+          --import
+          --noautoconsole
+          --graphics vnc
+          --boot uefi
+          --print-xml
+      register: vm_xml
+      when: not vm_exists
+
+    - name: Define VM
+      community.libvirt.virt:
+        command: define
+        xml: "{{ vm_xml.stdout }}"
+      when: not vm_exists
+
+    - name: Get VM disk path
+      ansible.builtin.shell: |
+        virsh domblklist {{ vm_name }} | awk '$1 == "vda" {print $2}'
+      register: vm_disk
+      changed_when: false
+      when: not vm_exists
+
+    - name: Create temporary network config directory
+      ansible.builtin.file:
+        path: "{{ vm_ifcfg_dir }}"
+        state: directory
+        mode: "0755"
+      when: not vm_exists
+
+    - name: Create network config
+      ansible.builtin.copy:
+        dest: "{{ vm_ifcfg_file }}"
+        mode: "0644"
+        content: |
+          TYPE=Ethernet
+          BOOTPROTO=static
+          NAME=static-enp1s0
+          DEVICE=enp1s0
+          ONBOOT=yes
+          IPADDR={{ vm_mgmt_ip }}
+          PREFIX={{ mgmt_cidr }}
+          GATEWAY={{ mgmt_gateway }}
+          DNS1={{ mgmt_dns_servers[0] }}
+          {% if mgmt_dns_servers | length > 1 %}
+          DNS2={{ mgmt_dns_servers[1] }}
+          {% endif %}
+      when: not vm_exists
+
+    - name: Inject network config into VM disk
+      ansible.builtin.command:
+        cmd: virt-copy-in -a {{ vm_disk.stdout }} {{ vm_ifcfg_file }} /etc/sysconfig/network-scripts/
+      environment:
+        LIBGUESTFS_BACKEND: direct
+      when: not vm_exists
+
+    - name: Remove temporary network config directory
+      ansible.builtin.file:
+        path: "{{ vm_ifcfg_dir }}"
+        state: absent
+
+    - name: Start VM
+      community.libvirt.virt:
+        name: "{{ vm_name }}"
+        state: running
+        autostart: true
+      when: not vm_exists
+      register: vm_start
+
+    - name: Wait for VM SSH to be available
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: 22
+        delay: 120
+        timeout: 900
+      when:
+        - vm_start is defined
+        - vm_start.changed | default(false)
+
+
+- name: Prep Nodes
+  hosts: all
+  gather_facts: false
+  serial: 1
+
+  tasks:
+    - name: Verify SSH connectivity
+      ansible.builtin.command: echo "SSH_OK"
+      register: vm_ssh_test
+      until: vm_ssh_test.stdout is search("SSH_OK")
+      retries: 30
+      delay: 30
+      changed_when: false
+
+    - name: Check uptime to detect if hardening reboots are complete
+      ansible.builtin.command: cat /proc/uptime
+      register: vm_uptime_raw
+      until: (vm_uptime_raw.stdout.split()[0] | float) > 150
+      retries: 20
+      delay: 60
+      changed_when: false
+
+    - name: Create KLM repo file
+      yum_repository:
+        name: "{{ repo_item.key }}"
+        description: "{{ repo_item.value.name }}"
+        baseurl: "{{ repo_item.value.baseurl }}"
+        enabled: "{{ repo_item.value.enabled | default(1) | bool }}"
+        gpgcheck: "{{ repo_item.value.gpgcheck | default(1) | bool }}"
+        failovermethod: "{{ repo_item.value.failovermethod | default(omit) }}"
+        file: "{{ repo.file }}"
+        state: present
+      loop: "{{ repo.entries | dict2items }}"
+      loop_control:
+        loop_var: repo_item
+        label: "{{ repo_item.key }}"
+      register: repo_result
+
+    - name: Refresh DNF metadata
+      dnf:
+        update_cache: true
+      when: repo_result.changed
+
+    - name: Configure /etc/resolv.conf
+      copy:
+        dest: /etc/resolv.conf
+        owner: root
+        group: root
+        mode: "0644"
+        backup: true
+        content: |
+          # Managed by Ansible
+          {% for dns_server in networks.dns_servers %}
+          nameserver {{ dns_server }}
+          {% endfor %}
+
+    - name: Set system hostname from inventory
+      hostname:
+        name: "{{ hostname }}.{{ domain_name }}"
+
+    - name: Create sudoers entry for user
+      copy:
+        dest: /etc/sudoers.d/{{ ansible_user }}
+        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: '0440'
+        validate: 'visudo -cf %s'

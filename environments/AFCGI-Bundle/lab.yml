@@ -1,0 +1,241 @@
+# OpenSpace LifeCycle Manager - Deployment Configuration (v1)
+---
+all:
+  vars:
+    env_name: Lab
+    domain_name: lab.kratos
+
+    klm:
+      home: /opt/openspace
+      owner: kratos
+      group: kratos
+
+      core:
+        version: 0.1.0
+        file: ./klm-core-0.1.0.bundle
+
+      bundles:
+        - name: basekit
+          type: infrastructure
+          version: 0.1.0
+          file: basekit-0.1.0.bundle
+
+        - name: onboarder
+          type: infrastructure
+          version: 3.8.0
+          file: onboarder-3.8.0.bundle
+
+        - name: openspace
+          type: application
+          version: 1.10.0-262
+          file: openspace-1.10.0-262.os-app
+          vnfs:
+            - name: qradio
+              version: 6.6.18
+              file: qradio-6.6.18.os-nf
+
+            - name: qfep
+              version: 4.6.29
+              file: qfep-4.6.29.os-nf
+
+            - name: vrecorder
+              version: 2.3.1
+              file: vrecorder-2.3.1.os-nf
+
+    networks:
+      dns_servers:
+        - 192.168.2.1
+        - 10.243.25.50
+        - 10.243.25.53
+
+      bridges:
+        br-wan:
+          description: Customer/WAN network
+          cidr: 10.243.76.0/23
+          gateway: 10.243.76.1
+
+        br-mgmt:
+          description: Management network
+          cidr: 192.168.2.0/24
+          gateway: 192.168.2.1
+
+        br-iDRAC:
+          description: iDRAC out-of-band network
+          cidr: 192.168.0.0/24
+          gateway: 192.168.0.1
+
+      firewall:
+        opnsense:
+          wan_ip: 10.243.77.223
+          lan_ip: 192.168.2.1
+
+      ntp:
+        servers: [192.168.2.100]
+        timezone: Etc/UTC
+
+    repo:
+      file: klm
+      entries:
+        rhel-9-baseos-rhui-rpms:
+          name: Red Hat Enterprise Linux 9 for $basearch - BaseOS from RHUI (RPMs)
+          baseurl: https://rhel9-repo.secops.kratosdefense.com/rhel-9-baseos-rhui-rpms
+          enabled: 1
+          gpgcheck: 1
+          sslverify: 0
+          
+
+        rhel-9-appstream-rhui-rpms:
+          name: Red Hat Enterprise Linux 9 for $basearch - AppStream from RHUI (RPMs)
+          baseurl: https://rhel9-repo.secops.kratosdefense.com/rhel-9-appstream-rhui-rpms
+          enabled: 1
+          gpgcheck: 1
+          sslverify: 0
+
+        rhui-client-config-server-9:
+          name: Red Hat Enterprise Linux 9 for $basearch - Client Config from RHUI (RPMs)
+          baseurl: https://rhel9-repo.secops.kratosdefense.com/rhui-client-config-server-9
+          enabled: 1
+          gpgcheck: 1
+          sslverify: 0
+
+        EPEL_9:
+          name: EPEL_9
+          baseurl: https://bits.devops.kratosdefense.com/artifactory/epel-remote/$releasever/Everything/$basearch
+          failovermethod: priority
+          enabled: 1
+          gpgcheck: 1
+          sslverify: 0
+
+  children:
+    management:
+      hosts:
+        klm-host:
+          description: Primary Management Host Running Kratos Lifecycle Manager
+          host_type: baremetal
+          hostname: mgmt-kvm
+          os: rhel9
+          ansible_host: localhost
+          ansible_connection: local
+          ansible_user: kratos
+          ansible_password: kratos
+          ansible_become_password: kratos
+
+          network:
+            interfaces:
+              br-wan:
+                type: bridge
+                ip: 10.243.77.213
+                physical_interface: eno8303
+                default_route: true
+
+              br-mgmt:
+                type: bridge
+                ip: 192.168.2.6
+                physical_interface: eno8403
+
+              br-iDRAC:
+                type: bridge
+                ip: 192.168.0.6
+                physical_interface: ens3f0
+
+    containers:
+      hosts:
+        onboarder:
+          description: Containerized Onboarding Environment for RK2 Cluster Deployment
+          host_type: container
+          ansible_host: onboarder
+          ansible_connection: containers.podman.podman
+
+
+    rke2-clusters:
+      vars:
+        ansible_user: kratos
+        ansible_password: kratos
+        ansible_become_password: kratos
+
+      children:
+        local:
+          vars:
+            cluster_type: mcm
+            ssh_key: rancher_ssh_key
+
+          hosts:
+            mcm1:
+              ansible_host: 192.168.2.8
+              hostname: mcm1
+              host_type: libvirt_vm
+              os: rhel9
+
+              network:
+                interfaces:
+                  br-mgmt:
+                    type: bridge
+                    ip: 192.168.2.8
+                    physical_interface: enp1s0
+
+              libvirt:
+                memory_mb: 16384
+                vcpus: 8
+                disk_gb: 500
+                backing_store: /var/lib/libvirt/config/images/9_5_hardened_image_vm.qcow2
+                os_variant: rhel9.5
+                network_bridge: br-mgmt
+
+        openspace-osms:
+          vars:
+            cluster_type: osms
+            ssh_key: osms_ssh_key
+
+          hosts:
+            osms1:
+              ansible_host: 192.168.2.9
+              hostname: osms1
+              host_type: libvirt_vm
+              os: rhel9
+
+              network:
+                interfaces:
+                  br-mgmt:
+                    type: bridge
+                    ip: 192.168.2.9
+                    physical_interface: enp1s0
+
+              libvirt:
+                memory_mb: 32768
+                vcpus: 16
+                disk_gb: 600
+                backing_store: /var/lib/libvirt/config/images/9_5_hardened_image_vm.qcow2
+                os_variant: rhel9.5
+                network_bridge: br-mgmt
+
+        openspace-osdc:
+          vars:
+            cluster_type: osdc
+            ssh_key: osdc_ssh_key
+
+          hosts:
+            osdc1:
+              ansible_host: 192.168.2.16
+              hostname: osdc1
+              host_type: baremetal
+              os: rhel9
+
+              network:
+                interfaces:
+                  ens2f0:
+                    type: physical
+                    ip: 192.168.2.16
+                    physical_interface: ens2f0
+
+            osdc2:
+              ansible_host: 192.168.2.17
+              hostname: osdc2
+              host_type: baremetal
+              os: rhel9
+
+              network:
+                interfaces:
+                  ens2f0:
+                    type: physical
+                    ip: 192.168.2.17
+                    physical_interface: ens2f0
