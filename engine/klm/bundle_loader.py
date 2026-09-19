@@ -19,7 +19,7 @@ RESOURCE_KEYS = (
     "workflows",
 )
 
-ALLOWED_SEMAPHORE_KEYS = RESOURCE_KEYS + ("systems",)
+ALLOWED_SEMAPHORE_KEYS = RESOURCE_KEYS + ("profiles", "systems")
 ALLOWED_BUNDLE_TYPES = ("capability", "architecture", "environment")
 
 
@@ -34,10 +34,18 @@ class BundleRequirement:
 
 
 @dataclass(frozen=True)
+class BundleProfile:
+    name: str
+    description: str = ""
+    requires: tuple = ()
+
+
+@dataclass(frozen=True)
 class BundleSystem:
     name: str
     enabled: bool = True
     description: str = ""
+    profile: str = ""
     requires: tuple = ()
 
 
@@ -49,6 +57,7 @@ class Bundle:
     description: str
     enabled: bool
     requires: list = field(default_factory=list)
+    profiles: list = field(default_factory=list)
     systems: list = field(default_factory=list)
     directory: str = ""
     metadata_file: str = ""
@@ -59,18 +68,14 @@ class Bundle:
     def enabled_systems(self):
         return [system for system in self.systems if system.enabled]
 
+    def get_profile(self, name):
+        if not name:
+            return None
+        return next((item for item in self.profiles if item.name == name), None)
+
 
 def discover_bundles(bundle_dir):
-    """
-    Discover installed bundles.
-
-    Absence is meaningful: if a bundle directory is removed, it is no longer
-    part of desired state and KLM will prune resources that it owns for it.
-
-    Incomplete bundles fail closed. A directory containing only bundle.yml or
-    only semaphore.yml is treated as a broken install and reconciliation stops
-    before any Semaphore changes are made.
-    """
+    """Discover and validate installed bundles."""
     if not os.path.isdir(bundle_dir):
         raise BundleError("Bundle directory does not exist: %s" % bundle_dir)
 
@@ -131,13 +136,16 @@ def load_bundle(directory, directory_name):
         raise BundleError("%s: 'enabled' must be true or false" % metadata_file)
 
     requires = _load_requirements(metadata.get("requires", []), metadata_file)
+    profiles = _load_profiles(metadata.get("profiles", []), metadata_file)
     systems = _load_systems(metadata.get("systems", []), metadata_file)
 
-    if systems and bundle_type != "environment":
+    if (profiles or systems) and bundle_type != "environment":
         raise BundleError(
-            "%s: 'systems' is only valid for bundles with type: environment"
+            "%s: 'profiles' and 'systems' are only valid for type: environment"
             % metadata_file
         )
+
+    _validate_system_profile_references(systems, profiles, metadata_file)
 
     if name != directory_name:
         raise BundleError(
@@ -159,6 +167,11 @@ def load_bundle(directory, directory_name):
             semaphore_file,
         )
 
+    _validate_semaphore_profiles(
+        semaphore.get("profiles", {}),
+        profiles,
+        semaphore_file,
+    )
     _validate_semaphore_systems(
         semaphore.get("systems", {}),
         systems,
@@ -172,6 +185,7 @@ def load_bundle(directory, directory_name):
         description=description,
         enabled=enabled,
         requires=requires,
+        profiles=profiles,
         systems=systems,
         directory=directory,
         metadata_file=metadata_file,
@@ -214,6 +228,48 @@ def _load_requirements(value, location):
     return result
 
 
+def _load_profiles(value, location):
+    if value is None:
+        return []
+
+    if not isinstance(value, list):
+        raise BundleError("%s: 'profiles' must be a list" % location)
+
+    result = []
+    seen = set()
+
+    for index, raw in enumerate(value):
+        item_location = "%s profiles[%d]" % (location, index)
+
+        if not isinstance(raw, dict):
+            raise BundleError("%s must be a mapping" % item_location)
+
+        unknown = [
+            key for key in raw
+            if key not in ("name", "description", "requires")
+        ]
+        if unknown:
+            raise BundleError(
+                "%s has unknown key(s): %s"
+                % (item_location, ", ".join(sorted(unknown)))
+            )
+
+        name = _required_string(raw, "name", item_location)
+        if name in seen:
+            raise BundleError("%s: duplicate profile '%s'" % (location, name))
+        seen.add(name)
+
+        result.append(
+            BundleProfile(
+                name=name,
+                description=str(raw.get("description", "")),
+                requires=tuple(_load_requirements(raw.get("requires", []), item_location)),
+            )
+        )
+
+    return result
+
+
 def _load_systems(value, location):
     if value is None:
         return []
@@ -232,7 +288,7 @@ def _load_systems(value, location):
 
         unknown = [
             key for key in raw
-            if key not in ("name", "enabled", "description", "requires")
+            if key not in ("name", "enabled", "description", "profile", "requires")
         ]
         if unknown:
             raise BundleError(
@@ -245,6 +301,8 @@ def _load_systems(value, location):
         if not isinstance(enabled, bool):
             raise BundleError("%s: 'enabled' must be true or false" % item_location)
 
+        profile = str(raw.get("profile", "")).strip()
+
         if name in seen:
             raise BundleError("%s: duplicate system '%s'" % (location, name))
         seen.add(name)
@@ -254,6 +312,7 @@ def _load_systems(value, location):
                 name=name,
                 enabled=enabled,
                 description=str(raw.get("description", "")),
+                profile=profile,
                 requires=tuple(_load_requirements(raw.get("requires", []), item_location)),
             )
         )
@@ -261,41 +320,74 @@ def _load_systems(value, location):
     return result
 
 
-def _validate_semaphore_systems(value, declared_systems, location):
+def _validate_system_profile_references(systems, profiles, location):
+    profile_names = {profile.name for profile in profiles}
+
+    for system in systems:
+        if system.profile and system.profile not in profile_names:
+            raise BundleError(
+                "%s: system '%s' references unknown profile '%s'"
+                % (location, system.name, system.profile)
+            )
+
+
+def _validate_resource_sections(value, declared_names, section_label, location):
     if value is None:
         value = {}
 
     if not isinstance(value, dict):
-        raise BundleError("%s: 'systems' must be a mapping" % location)
+        raise BundleError("%s: '%s' must be a mapping" % (location, section_label))
 
-    declared_names = {system.name for system in declared_systems}
-
-    for system_name, section in value.items():
-        if system_name not in declared_names:
+    for item_name, section in value.items():
+        if item_name not in declared_names:
             raise BundleError(
-                "%s: Semaphore system '%s' is not declared in bundle.yml systems"
-                % (location, system_name)
+                "%s: Semaphore %s '%s' is not declared in bundle.yml"
+                % (location, section_label[:-1], item_name)
             )
 
         if not isinstance(section, dict):
             raise BundleError(
-                "%s: systems.%s must be a mapping"
-                % (location, system_name)
+                "%s: %s.%s must be a mapping"
+                % (location, section_label, item_name)
             )
 
         for key in section:
             if key not in RESOURCE_KEYS:
                 raise BundleError(
-                    "%s: systems.%s has unknown key '%s'. Allowed: %s"
-                    % (location, system_name, key, ", ".join(RESOURCE_KEYS))
+                    "%s: %s.%s has unknown key '%s'. Allowed: %s"
+                    % (
+                        location,
+                        section_label,
+                        item_name,
+                        key,
+                        ", ".join(RESOURCE_KEYS),
+                    )
                 )
 
         for field_name in RESOURCE_KEYS:
             _require_list_of_mappings(
                 section.get(field_name, []),
-                "systems.%s.%s" % (system_name, field_name),
+                "%s.%s.%s" % (section_label, item_name, field_name),
                 location,
             )
+
+
+def _validate_semaphore_profiles(value, declared_profiles, location):
+    _validate_resource_sections(
+        value,
+        {profile.name for profile in declared_profiles},
+        "profiles",
+        location,
+    )
+
+
+def _validate_semaphore_systems(value, declared_systems, location):
+    _validate_resource_sections(
+        value,
+        {system.name for system in declared_systems},
+        "systems",
+        location,
+    )
 
 
 def _check_duplicate_bundle_names(bundles):

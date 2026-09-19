@@ -1,145 +1,258 @@
-# Contract-level resources are available to whichever AFCGI system is selected.
+# Contract-level resources shared by every AFCGI system.
 repositories:
   - name: AFCGI Environment
     url: file:///opt/openspace/environments/afcgi
     branch: main
 
-systems:
-  SKCT2:
+# Profiles are reusable system recipes. KLM 1.3.0 expands the selected
+# profile using these placeholders:
+#   {system}       -> SKCT2
+#   {system_lower} -> skct2
+#   {profile}      -> ground
+#   {environment}  -> afcgi
+profiles:
+  ground:
     inventories:
-      - name: SKCT2
+      - name: "{system}"
         type: file
-        inventory: inventory/skct2.yml
+        inventory: "inventory/{system_lower}.yml"
         repository: AFCGI Environment
         ssh_key: AFCGI SSH User
         become_key: AFCGI Root
 
     views:
-      - name: SKCT2
+      - name: "{system}"
 
     templates:
-      - name: SKCT2 Ping
-        description: SKCT2-bound use of the reusable Onboarder ping automation
-        view: SKCT2
-        repository: Onboarder
-        inventory: SKCT2
-        playbook: playbooks/ping.yml
-
-      - name: SKCT2 Onboard
-        description: SKCT2-bound use of the reusable Onboarder automation
-        view: SKCT2
-        repository: Onboarder
-        inventory: SKCT2
-        playbook: playbooks/onboard-system.yml
-
-      - name: SKCT2 BaseKit Precheck
-        description: SKCT2-bound use of the BaseKit architecture precheck
-        view: SKCT2
-        repository: BaseKit
-        inventory: SKCT2
-        playbook: playbooks/precheck.yml
-
-      - name: SKCT2 Deploy OpenSpace
-        description: SKCT2-bound use of reusable OpenSpace deployment automation
-        view: SKCT2
-        repository: OpenSpace
-        inventory: SKCT2
-        playbook: playbooks/deploy-openspace.yml
-
-      - name: SKCT2 Root Access Check
-        description: Verify username/password SSH plus su-to-root become credentials
-        view: SKCT2
+      - name: "{system} Setup Host"
+        description: Apply AFCGI host-specific configuration before reusable automation runs.
+        view: "{system}"
         repository: AFCGI Environment
-        inventory: SKCT2
-        playbook: playbooks/root-access-check.yml
+        inventory: "{system}"
+        playbook: playbooks/setup-host.yml
+
+      - name: "{system} Change OPNSense Settings"
+        description: Apply AFCGI/site-specific OPNSense changes after the BaseKit baseline.
+        view: "{system}"
+        repository: AFCGI Environment
+        inventory: "{system}"
+        playbook: playbooks/change-opnsense-settings.yml
 
     workflows:
-      - name: Build SKCT2
-        description: Example start-to-finish SKCT2 workflow tailored by the AFCGI environment
-        view: SKCT2
+      - name: "Install {system}"
+        description: Complete AFCGI ground installation using the shared ground profile.
+        view: "{system}"
         nodes:
-          - id: ping
+          - id: setup_mgmt_kvm
             type: task
-            template: SKCT2 Ping
-            x: 0
-            y: 0
-          - id: onboard
+            template: "{system} Setup Host"
+            task_params:
+              params:
+                limit:
+                  - mgmt-kvm
+
+          - id: generate_ssh_key
             type: task
-            template: SKCT2 Onboard
-            x: 300
-            y: 0
-          - id: root
+            template: basekit::Generate SSH Key
+
+          - id: push_ssh_key_mgmt
             type: task
-            template: SKCT2 Root Access Check
-            x: 600
-            y: 0
-          - id: basekit
+            template: basekit::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - mgmt-kvm
+
+          - id: bootstrap_mgmt_kvm
             type: task
-            template: SKCT2 BaseKit Precheck
-            x: 900
-            y: 0
-          - id: openspace
+            template: basekit::Bootstrap MGMT KVM
+
+          - id: configure_opnsense
             type: task
-            template: SKCT2 Deploy OpenSpace
-            x: 1200
-            y: 0
+            template: basekit::Configure OPNSense
+
+          - id: change_opnsense_settings
+            type: task
+            template: "{system} Change OPNSense Settings"
+
+          - id: copy_opnsense_config
+            type: task
+            template: basekit::Copy OPNSense Config
+
+          - id: install_opnsense
+            type: task
+            template: basekit::Install OPNSense
+
+          - id: deploy_vms
+            type: task
+            template: basekit::Deploy VMs
+
+          - id: setup_mcm
+            type: task
+            template: "{system} Setup Host"
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: push_ssh_key_mcm
+            type: task
+            template: basekit::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: prep_mcm
+            type: task
+            template: onboarder::Node Prep
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: deploy_kubernetes
+            type: task
+            template: onboarder::Deploy Kubernetes
+
+          - id: deploy_harbor
+            type: task
+            template: onboarder::Deploy Harbor
+
+          - id: deploy_rancher
+            type: task
+            template: onboarder::Deploy Rancher
+
+          - id: deploy_gitea
+            type: task
+            template: onboarder::Deploy Gitea
+
+          - id: deploy_argocd
+            type: task
+            template: onboarder::Deploy ArgoCD
+
+          - id: setup_osms
+            type: task
+            template: "{system} Setup Host"
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: push_ssh_key_osms
+            type: task
+            template: basekit::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: prep_osms
+            type: task
+            template: onboarder::Node Prep
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: deploy_osms
+            type: task
+            template: onboarder::Deploy OpenSpace Cluster
+            task_params:
+              arguments: '["-e", "openspace-osms"]'
+
+          - id: approve_osms
+            type: approval
+            approval_message: Did the OSMS cluster deploy successfully?
+
+          - id: setup_osdc
+            type: task
+            template: "{system} Setup Host"
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          - id: push_ssh_key_osdc
+            type: task
+            template: basekit::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          - id: prep_osdc
+            type: task
+            template: onboarder::Node Prep
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          - id: deploy_osdc
+            type: task
+            template: onboarder::Deploy OpenSpace Cluster
+            task_params:
+              arguments: '["-e", "openspace-osdc"]'
+
+          - id: approve_osdc
+            type: approval
+            approval_message: Did the OSDC cluster deploy successfully?
+
+          - id: post_osdc
+            type: task
+            template: onboarder::Post OSDC
+
+          - id: generate_config
+            type: task
+            template: openspace::Generate Config
+
+          - id: push_images
+            type: task
+            template: openspace::Push Images
+
+          - id: start_openspace
+            type: task
+            template: openspace::Start OpenSpace
+
         edges:
-          - from: ping
-            to: onboard
-            condition: on_success
-          - from: onboard
-            to: root
-            condition: on_success
-          - from: root
-            to: basekit
-            condition: on_success
-          - from: basekit
-            to: openspace
-            condition: on_success
+          - {from: setup_mgmt_kvm, to: generate_ssh_key, condition: on_success}
+          - {from: generate_ssh_key, to: push_ssh_key_mgmt, condition: on_success}
+          - {from: push_ssh_key_mgmt, to: bootstrap_mgmt_kvm, condition: on_success}
+          - {from: bootstrap_mgmt_kvm, to: configure_opnsense, condition: on_success}
+          - {from: configure_opnsense, to: change_opnsense_settings, condition: on_success}
+          - {from: change_opnsense_settings, to: copy_opnsense_config, condition: on_success}
+          - {from: copy_opnsense_config, to: install_opnsense, condition: on_success}
+          - {from: install_opnsense, to: deploy_vms, condition: on_success}
+          - {from: deploy_vms, to: setup_mcm, condition: on_success}
+          - {from: setup_mcm, to: push_ssh_key_mcm, condition: on_success}
+          - {from: push_ssh_key_mcm, to: prep_mcm, condition: on_success}
+          - {from: prep_mcm, to: deploy_kubernetes, condition: on_success}
+          - {from: deploy_kubernetes, to: deploy_harbor, condition: on_success}
+          - {from: deploy_harbor, to: deploy_rancher, condition: on_success}
+          - {from: deploy_rancher, to: deploy_gitea, condition: on_success}
+          - {from: deploy_gitea, to: deploy_argocd, condition: on_success}
+          - {from: deploy_argocd, to: setup_osms, condition: on_success}
+          - {from: setup_osms, to: push_ssh_key_osms, condition: on_success}
+          - {from: push_ssh_key_osms, to: prep_osms, condition: on_success}
+          - {from: prep_osms, to: deploy_osms, condition: on_success}
+          - {from: deploy_osms, to: approve_osms, condition: on_success}
+          - {from: approve_osms, to: setup_osdc, condition: on_success}
+          - {from: setup_osdc, to: push_ssh_key_osdc, condition: on_success}
+          - {from: push_ssh_key_osdc, to: prep_osdc, condition: on_success}
+          - {from: prep_osdc, to: deploy_osdc, condition: on_success}
+          - {from: deploy_osdc, to: approve_osdc, condition: on_success}
+          - {from: approve_osdc, to: post_osdc, condition: on_success}
+          - {from: post_osdc, to: generate_config, condition: on_success}
+          - {from: generate_config, to: push_images, condition: on_success}
+          - {from: push_images, to: start_openspace, condition: on_success}
 
-  GEP1:
-    inventories:
-      - name: GEP1
-        type: file
-        inventory: inventory/gep1.yml
-        repository: AFCGI Environment
-        ssh_key: AFCGI SSH User
-        become_key: AFCGI Root
-
+  # Cloud gets a separate dependency set. No cloud workflow is invented here;
+  # add AFCGI cloud orchestration when the AWS install sequence is defined.
+  cloud:
     views:
-      - name: GEP1
+      - name: "{system}"
 
-    templates:
-      - name: GEP1 Ping
-        description: GEP1-bound use of the reusable Onboarder ping automation
-        view: GEP1
-        repository: Onboarder
-        inventory: GEP1
-        playbook: playbooks/ping.yml
-
-      - name: GEP1 Validate OpenSpace
-        description: GEP1-bound use of reusable OpenSpace validation automation
-        view: GEP1
-        repository: OpenSpace
-        inventory: GEP1
-        playbook: playbooks/validate-openspace.yml
-
-    workflows:
-      - name: Validate GEP1
-        description: Example GEP1-specific validation workflow
-        view: GEP1
-        nodes:
-          - id: ping
-            type: task
-            template: GEP1 Ping
-            x: 0
-            y: 0
-          - id: validate
-            type: task
-            template: GEP1 Validate OpenSpace
-            x: 300
-            y: 0
-        edges:
-          - from: ping
-            to: validate
-            condition: on_success
+# Optional per-system additions belong here when one site truly differs from
+# its profile. Shared SKCT/GEP logic should remain under profiles.ground.
+systems: {}

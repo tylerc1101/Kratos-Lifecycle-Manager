@@ -7,14 +7,57 @@ views:
   - name: Onboarder Tools
 
 templates:
-  - name: Ping Host
-    description: Basic connectivity check. Operator chooses the inventory at launch.
+  - name: Node Prep
+    description: Prepare a node for Kubernetes/OpenSpace deployment.
     view: Onboarder Tools
     repository: Onboarder
-    playbook: playbooks/ping.yml
+    playbook: playbooks/node-prep.yml
 
-  - name: Onboard System
-    description: Example reusable onboarding task. Operator chooses the inventory at launch.
+  - name: Deploy Kubernetes
+    description: Deploy the management Kubernetes cluster.
     view: Onboarder Tools
     repository: Onboarder
-    playbook: playbooks/onboard-system.yml
+    app: bash
+    playbook: scripts/deploy-kubernetes.sh
+
+  - name: Deploy Harbor
+    description: Deploy Harbor.
+    view: Onboarder Tools
+    repository: Onboarder
+    app: bash
+    playbook: scripts/deploy-harbor.sh
+
+  - name: Deploy Rancher
+    description: Deploy Rancher.
+    view: Onboarder Tools
+    repository: Onboarder
+    app: bash
+    playbook: scripts/deploy-rancher.sh
+
+  - name: Deploy Gitea
+    description: Deploy Gitea.
+    view: Onboarder Tools
+    repository: Onboarder
+    app: bash
+    playbook: scripts/deploy-gitea.sh
+
+  - name: Deploy ArgoCD
+    description: Deploy ArgoCD.
+    view: Onboarder Tools
+    repository: Onboarder
+    app: bash
+    playbook: scripts/deploy-argocd.sh
+
+  - name: Deploy OpenSpace Cluster
+    description: Deploy an OpenSpace cluster using the supplied script arguments.
+    view: Onboarder Tools
+    repository: Onboarder
+    app: bash
+    playbook: scripts/deploy-openspace-cluster.sh
+    allow_override_args_in_task: true
+
+  - name: Post OSDC
+    description: Perform post-deployment OSDC configuration.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/post_osdc.yml

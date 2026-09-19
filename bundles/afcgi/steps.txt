@@ -1,0 +1,89 @@
+Install OS on servers
+IP Servers
+    MGMGT:
+        nmcli con del eno12409
+        nmcli con add type bridge \
+            ifname br-wan \
+            con-name br-wan
+        nmcli con mod br-wan \
+            ipv4.method manual \
+            ipv4.addresses 10.243.77.212/23 \
+            ipv4.gateway 10.243.76.1 \
+            ipv4.dns "10.243.25.50,10.243.25.53" \
+            ipv4.dns-search "~." \
+            ipv4.ignore-auto-dns yes \
+            ipv6.method disabled
+        nmcli con add type ethernet \
+            ifname eno12409 \
+            con-name eno12409 \
+            master br-wan \
+            slave-type bridge
+        nmcli con up br-wan
+        nmcli con up eno12409
+
+	OSDC1 
+	    nmcli con mod ens2f0 ipv4.method manual ipv4.addresses 192.168.2.16/24 ipv4.gateway 192.168.2.1 ipv6.method disabled connection.autoconnect yes
+	    nmcli con up ens2f0
+	
+	OSDC2
+	    nmcli con mod ens2f0 ipv4.method manual ipv4.addresses 192.168.2.17/24 ipv4.gateway 192.168.2.1 ipv6.method disabled connection.autoconnect yes
+	    nmcli con up ens2f0
+
+    (Can ping between both OSDCs after both are configured)
+
+
+Install KLM and Bundles then configure Semaphore on the MGMT-KVM
+
+Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the workflow is doing)
+
+
+
+[afcgi bundle] - setup-host.yml [limit=mgmt-kvm]
+[basekit bundle] - generate-ssh-key.yml
+[basekit bundle] - push-ssh-key.yml [limit=mgmt-kvm]
+[basekit bundle] - bootstrap-mgmt-kvm.yml
+[basekit bundle] - configure-opnsense.yml
+[afcgi bundle] - change-opnsense-settings.yml (Change farg for laptop)
+[basekit bundle] - copy-opnsense-config.yml
+[basekit bundle] - install_opnsense.sh
+[basekit bundle] - deploy-vms.yml
+[afcgi bundle] - setup-host.yml [limit=mcm]
+[basekit bundle] - push-ssh-key.yml [limit=mcm]
+[onboarder bundle] - node-prep.yml [limit=mcm]
+[onboarder bundle] - deploy-kubernetes.sh
+[onboarder bundle] - deploy-harbor.sh
+[onboarder bundle] - deploy-rancher.sh
+[onboarder bundle] - deploy-gitea.sh
+[onboarder bundle] - deploy-argocd.sh
+[afcgi bundle] - setup-host.yml [limit=osms]
+[basekit bundle] - push-ssh-key.yml [limit=osms]
+[onboarder bundle] - node-prep.yml [limit=osms]
+[onboarder bundle] - deploy-openspace-cluster [-e openspace-osms]
+[onboarder bundle] - approval [Did the cluster deploy successfully?]
+[afcgi bundle] - setup-host.yml [limit=osdc]
+[basekit bundle] - push-ssh-key.yml [limit=osdc]
+[onboarder bundle] - node-prep.yml [limit=osdc]
+[onboarder bundle] - deploy-openspace-cluster [-e openspace-osdc]
+[onboarder bundle] - approval [Did the cluster deploy successfully?]
+[onboarder bundle] - post_osdc.yml
+[openspace bundle] - generate-config.yml
+[openspace bundle] - push-images.sh
+[openspace bundle] - start.sh
+
+
+run env_prep.yml on all nodes (hostname, repos setup, /etc/resolv, chrony)
+
+onboarder steps:
+node-prep.yml
+    env osdc nic driver install
+    env playbook, change /etc/resolv back to br-mgmt
+prep-container.yml
+    setup config directory in /opt/openspace/onboarder_config
+    configure files in directory (onboarder and downstream)
+    create ssh_key and distribute
+    start onboarder with directory mounted /docker-workspace/config/{{ env }}
+run makes (Not playbook)
+    ??? maybe bash script using ssh_key to run a podman exec command?
+deploy downstream cluster
+    manual step? has a question that needs to be answered and cant with semaphore
+deploy openspace

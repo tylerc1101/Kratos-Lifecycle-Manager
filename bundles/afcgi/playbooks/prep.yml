@@ -1,0 +1,4 @@
+create repo
+
+create /etc/resolv
+  (hostnamectl command reset /etc/resolv)

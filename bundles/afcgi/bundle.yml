@@ -2,18 +2,48 @@ name: afcgi
 version: 1.0.0
 type: environment
 enabled: true
-description: Example AFCGI contract environment
-systems:
-  - name: SKCT2
-    enabled: true
-    description: SKCT2 configuration within the AFCGI contract
+description: AFCGI contract environment containing ground and cloud systems
+
+profiles:
+  - name: ground
+    description: Shared installation profile for SKCT and GEP ground systems
     requires:
       - name: basekit
         version: 1.0.0
 
+  - name: cloud
+    description: Cloud installation profile. AWS-specific workflow content can be added later.
+    requires:
+      - name: aws
+        version: 1.0.0
+
+systems:
+  - name: SKCT1
+    enabled: true
+    profile: ground
+    description: AFCGI SKCT1 ground system
+
+  - name: SKCT2
+    enabled: true
+    profile: ground
+    description: AFCGI SKCT2 ground system
+
+  - name: SKCT3
+    enabled: true
+    profile: ground
+    description: AFCGI SKCT3 ground system
+
   - name: GEP1
     enabled: true
-    description: GEP1 configuration within the AFCGI contract
-    requires:
-      - name: basekit
-        version: 1.0.0
+    profile: ground
+    description: AFCGI GEP1 ground system
+
+  - name: GEP2
+    enabled: true
+    profile: ground
+    description: AFCGI GEP2 ground system
+
+  - name: CLOUD1
+    enabled: true
+    profile: cloud
+    description: Placeholder AFCGI cloud system; rename/add cloud systems as needed

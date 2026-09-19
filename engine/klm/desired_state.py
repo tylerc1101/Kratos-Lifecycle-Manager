@@ -218,6 +218,11 @@ def build_desired_state(
     Merge enabled capability/architecture bundles plus one selected environment
     system into one desired Semaphore state.
 
+    Environment systems may name a reusable profile. Profile resources are
+    expanded only for the selected system, so one definition can serve SKCT1,
+    SKCT2, SKCT3, GEP1, and GEP2 while each system keeps its own inventory and
+    ownership keys.
+
     Import order is irrelevant. The entire dependency graph and every
     cross-bundle reference are validated before reconciliation starts.
     """
@@ -232,6 +237,7 @@ def build_desired_state(
             )
 
     active_bundles = [bundle for bundle in normal_bundles if bundle.enabled]
+    selected_profile = None
 
     if environment_bundle is not None:
         if environment_bundle.bundle_type != "environment":
@@ -253,10 +259,19 @@ def build_desired_state(
                 % (selected_system.name, environment_bundle.name)
             )
 
+        if selected_system.profile:
+            selected_profile = environment_bundle.get_profile(selected_system.profile)
+            if selected_profile is None:
+                raise DesiredStateError(
+                    "Selected system '%s' references unknown profile '%s'"
+                    % (selected_system.name, selected_system.profile)
+                )
+
     _check_bundle_requirements(
         normal_bundles,
         environment_bundle=environment_bundle,
         selected_system=selected_system,
+        selected_profile=selected_profile,
     )
 
     for bundle in active_bundles:
@@ -277,6 +292,26 @@ def build_desired_state(
             system_name="",
         )
 
+        # A profile is a reusable system recipe. Render its small set of KLM
+        # placeholders, then scope all resources to the selected system.
+        if selected_profile is not None:
+            semaphore_profiles = environment_bundle.semaphore.get("profiles", {})
+            raw_profile_section = semaphore_profiles.get(selected_profile.name, {})
+            rendered_profile_section = _render_profile_section(
+                raw_profile_section,
+                environment_name=environment_bundle.name,
+                profile_name=selected_profile.name,
+                system_name=selected_system.name,
+            )
+            _append_resource_section(
+                state,
+                environment_bundle,
+                rendered_profile_section,
+                system_name=selected_system.name,
+            )
+
+        # System-specific resources remain available for exceptional additions
+        # that should not be shared by every member of a profile.
         semaphore_systems = environment_bundle.semaphore.get("systems", {})
         _append_resource_section(
             state,
@@ -293,6 +328,7 @@ def build_desired_state(
     _check_references(state)
     assign_view_positions(state)
     return state
+
 
 def _append_resource_section(state, bundle, section, system_name):
     for raw in section.get("repositories", []):
@@ -311,6 +347,36 @@ def _append_resource_section(state, bundle, section, system_name):
         state.workflows.append(_build_workflow(bundle, raw, system_name))
 
 
+def _render_profile_section(section, environment_name, profile_name, system_name):
+    """Render the intentionally small placeholder set supported by profiles."""
+    replacements = {
+        "{environment}": environment_name,
+        "{profile}": profile_name,
+        "{system}": system_name,
+        "{system_lower}": system_name.lower(),
+    }
+    return _render_profile_value(section, replacements)
+
+
+def _render_profile_value(value, replacements):
+    if isinstance(value, str):
+        rendered = value
+        for token, replacement in replacements.items():
+            rendered = rendered.replace(token, replacement)
+        return rendered
+
+    if isinstance(value, list):
+        return [_render_profile_value(item, replacements) for item in value]
+
+    if isinstance(value, dict):
+        return {
+            key: _render_profile_value(item, replacements)
+            for key, item in value.items()
+        }
+
+    return value
+
+
 def _resource_state_key(bundle_name, system_name, resource_name):
     if system_name:
         return "%s::%s::%s" % (bundle_name, system_name, resource_name)
@@ -321,6 +387,7 @@ def _check_bundle_requirements(
     bundles,
     environment_bundle=None,
     selected_system=None,
+    selected_profile=None,
 ):
     """Validate exact bundle dependencies and report all missing/mismatched items."""
     installed = {bundle.name: bundle for bundle in bundles}
@@ -344,6 +411,14 @@ def _check_bundle_requirements(
                 "environment '%s'" % environment_bundle.name,
                 requirement,
             ))
+
+        if selected_profile is not None:
+            for requirement in selected_profile.requires:
+                requirements.append((
+                    "environment '%s' profile '%s'"
+                    % (environment_bundle.name, selected_profile.name),
+                    requirement,
+                ))
 
         if selected_system is not None:
             for requirement in selected_system.requires:

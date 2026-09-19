@@ -2,7 +2,7 @@ name: basekit
 version: 1.0.0
 type: architecture
 enabled: true
-description: Example architecture bundle that composes Onboarder and OpenSpace capabilities
+description: Reusable BaseKit ground infrastructure automation
 requires:
   - name: onboarder
     version: 1.0.0

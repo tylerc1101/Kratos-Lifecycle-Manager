@@ -1,0 +1,8 @@
+---
+- name: Placeholder - AFCGI setup host
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Replace this placeholder before use
+      ansible.builtin.fail:
+        msg: "TODO: implement AFCGI setup host"

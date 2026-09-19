@@ -7,14 +7,22 @@ views:
   - name: OpenSpace Tools
 
 templates:
-  - name: Deploy OpenSpace
-    description: Example reusable OpenSpace deployment task. Operator chooses the inventory at launch.
+  - name: Generate Config
+    description: Generate the OpenSpace configuration for the selected system.
     view: OpenSpace Tools
     repository: OpenSpace
-    playbook: playbooks/deploy-openspace.yml
+    playbook: playbooks/generate-config.yml
 
-  - name: Validate OpenSpace
-    description: Example reusable OpenSpace validation task. Operator chooses the inventory at launch.
+  - name: Push Images
+    description: Push OpenSpace images to the target environment.
     view: OpenSpace Tools
     repository: OpenSpace
-    playbook: playbooks/validate-openspace.yml
+    app: bash
+    playbook: scripts/push-images.sh
+
+  - name: Start OpenSpace
+    description: Start the OpenSpace deployment.
+    view: OpenSpace Tools
+    repository: OpenSpace
+    app: bash
+    playbook: scripts/start.sh

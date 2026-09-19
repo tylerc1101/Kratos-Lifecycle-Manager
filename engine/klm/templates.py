@@ -25,9 +25,12 @@ def resolve_template_inventories(
     environment_bundle=None,
     selected_system=None,
 ):
-    """Resolve and validate every template inventory before child mutations.
+    """Resolve and validate template inventories before child mutations.
 
-    Resolution order for a template that omits ``inventory``:
+    Only Ansible templates require an inventory. Other Semaphore apps may
+    omit inventory entirely.
+
+    Resolution order for an Ansible template that omits ``inventory``:
 
     1. If an environment/system is selected and that system defines exactly
        one KLM-managed inventory, use it.
@@ -67,10 +70,12 @@ def resolve_template_inventories(
         operator_inventories,
     )
 
+    # Semaphore requires an inventory for Ansible templates. Other apps
+    # (bash, python, terraform, etc.) can legitimately run without one.
     unresolved = [
         item
         for item in desired_templates
-        if not item.inventory_name
+        if item.app == "ansible" and not item.inventory_name
     ]
     if not unresolved:
         return
@@ -238,9 +243,7 @@ def _resolve_inventory_id(client, inventory_name, inventory_ids):
     - Inventory omission must already have been resolved by preflight.
     """
     if not inventory_name:
-        raise ReconcileError(
-            "Template inventory was not resolved before template reconciliation"
-        )
+        return None
 
     managed_id = inventory_ids.get(inventory_name)
     if managed_id is not None:

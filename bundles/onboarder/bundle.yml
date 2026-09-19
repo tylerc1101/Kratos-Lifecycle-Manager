@@ -2,4 +2,4 @@ name: onboarder
 version: 1.0.0
 type: capability
 enabled: true
-description: Reusable host onboarding automation
+description: Reusable Kubernetes and OpenSpace cluster onboarding automation

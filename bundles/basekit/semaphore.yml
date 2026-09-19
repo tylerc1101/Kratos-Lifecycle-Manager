@@ -7,39 +7,45 @@ views:
   - name: BaseKit
 
 templates:
-  - name: BaseKit Precheck
-    description: Example BaseKit architecture precheck. Operator chooses the inventory at launch.
+  - name: Generate SSH Key
+    description: Generate the SSH key material used during BaseKit installation.
     view: BaseKit
     repository: BaseKit
-    playbook: playbooks/precheck.yml
+    playbook: playbooks/generate-ssh-key.yml
 
-workflows:
-  - name: Build BaseKit
-    description: Example architecture workflow composed from multiple required bundles
+  - name: Push SSH Key
+    description: Push the generated SSH key to selected hosts.
     view: BaseKit
-    nodes:
-      - id: precheck
-        type: task
-        template: BaseKit Precheck
-        x: 0
-        y: 0
+    repository: BaseKit
+    playbook: playbooks/push-ssh-key.yml
 
-      - id: onboard
-        type: task
-        template: onboarder::Onboard System
-        x: 300
-        y: 0
+  - name: Bootstrap MGMT KVM
+    description: Bootstrap the management KVM host.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/bootstrap-mgmt-kvm.yml
 
-      - id: openspace
-        type: task
-        template: openspace::Deploy OpenSpace
-        x: 600
-        y: 0
+  - name: Configure OPNSense
+    description: Configure the reusable BaseKit OPNSense baseline.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/configure-opnsense.yml
 
-    edges:
-      - from: precheck
-        to: onboard
-        condition: on_success
-      - from: onboard
-        to: openspace
-        condition: on_success
+  - name: Copy OPNSense Config
+    description: Copy the generated OPNSense configuration into place.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/copy-opnsense-config.yml
+
+  - name: Install OPNSense
+    description: Run the BaseKit OPNSense installation script.
+    view: BaseKit
+    repository: BaseKit
+    app: bash
+    playbook: scripts/install_opnsense.sh
+
+  - name: Deploy VMs
+    description: Deploy the BaseKit virtual machines.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/deploy-vms.yml

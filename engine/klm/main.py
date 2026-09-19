@@ -20,7 +20,7 @@ import workflows
 from client import DRY_RUN_ID, SemaphoreApiError, SemaphoreClient
 from errors import ReconcileError
 
-KLM_VERSION = "1.2.3"
+KLM_VERSION = "1.3.0"
 LOG = logging.getLogger("klm")
 
 
@@ -89,7 +89,10 @@ def command_bundles_list(args):
         for index, system in enumerate(bundle.systems):
             system_state = "enabled" if system.enabled else "disabled"
             branch = "└─" if index == len(bundle.systems) - 1 else "├─"
-            print("  %s %-36s %s" % (branch, system.name, system_state))
+            label = system.name
+            if system.profile:
+                label = "%s [profile: %s]" % (label, system.profile)
+            print("  %s %-36s %s" % (branch, label, system_state))
 
     return 0
 
@@ -136,6 +139,8 @@ def command_bundles_validate(args):
     if environment_bundle is not None:
         print("Environment:  %s" % environment_bundle.name)
         print("System:       %s" % selected_system.name)
+        if selected_system.profile:
+            print("Profile:      %s" % selected_system.profile)
     else:
         print("Environment:  none selected")
     if environment_bundle is not None:
@@ -255,12 +260,14 @@ def command_env(args):
             print("  None")
             return 0
 
+        print("  %-20s %-20s %-12s %s" % ("ENVIRONMENT", "SYSTEM", "PROFILE", "STATUS"))
         for bundle in environments:
             for system in bundle.systems:
                 state = "enabled" if system.enabled else "disabled"
+                profile = system.profile or "-"
                 print(
-                    "  %-20s %-20s %s"
-                    % (bundle.name, system.name, state)
+                    "  %-20s %-20s %-12s %s"
+                    % (bundle.name, system.name, profile, state)
                 )
         return 0
 
@@ -288,6 +295,8 @@ def command_env(args):
     print("Environment selected.")
     print("Environment: %s" % environment_bundle.name)
     print("System:      %s" % selected_system.name)
+    if selected_system.profile:
+        print("Profile:     %s" % selected_system.profile)
     print("Dependencies and cross-bundle references validated.")
 
     requirements = _required_key_stores(wanted)
@@ -335,7 +344,10 @@ def command_env_validate_path(args):
     print("Version: %s" % bundle.version)
     print("Systems:")
     for system in bundle.systems:
-        print("  %s" % system.name)
+        if system.profile:
+            print("  %s [profile: %s]" % (system.name, system.profile))
+        else:
+            print("  %s" % system.name)
     return 0
 
 
@@ -473,11 +485,19 @@ def command_reconcile(args):
         len(wanted.workflows),
     )
     if environment_bundle is not None:
-        LOG.info(
-            "Selected environment: %s / %s",
-            environment_bundle.name,
-            selected_system.name,
-        )
+        if selected_system.profile:
+            LOG.info(
+                "Selected environment: %s / %s (profile: %s)",
+                environment_bundle.name,
+                selected_system.name,
+                selected_system.profile,
+            )
+        else:
+            LOG.info(
+                "Selected environment: %s / %s",
+                environment_bundle.name,
+                selected_system.name,
+            )
 
     if settings.dry_run:
         LOG.info("Running in dry-run mode")
