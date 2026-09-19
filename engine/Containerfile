@@ -141,7 +141,7 @@ ENV SEMAPHORE_ADMIN="admin" \
 # KLM startup
 # ---------------------------------------------------------------------------
 
-COPY engine/entrypoint.sh /usr/local/bin/klm-entrypoint
+COPY entrypoint.sh /usr/local/bin/klm-entrypoint
 
 RUN chmod 0755 /usr/local/bin/klm-entrypoint
 
