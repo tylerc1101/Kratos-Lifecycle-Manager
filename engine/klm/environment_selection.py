@@ -117,6 +117,17 @@ def save_selection(path, bundle_name, system_name):
         ) from error
 
 
+def clear_selection(path):
+    """Clear the active environment/system selection if one exists."""
+    try:
+        if os.path.exists(path):
+            os.unlink(path)
+    except OSError as error:
+        raise EnvironmentSelectionError(
+            "Could not clear environment selection %s: %s" % (path, error)
+        ) from error
+
+
 def load_selection(path, required=False):
     if not os.path.isfile(path):
         if required:

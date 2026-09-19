@@ -12,6 +12,12 @@ KLM_SECRETS="${KLM_ROOT}/secrets"
 KLM_STAGING="${KLM_ROOT}/staging"
 
 KLM_STATE="${KLM_ROOT}/state"
+KLM_KLM_STATE="${KLM_STATE}/klm"
+KLM_SEMAPHORE_STATE="${KLM_STATE}/semaphore"
+KLM_TLS_STATE="${KLM_STATE}/tls"
+KLM_SELECTION_FILE="${KLM_KLM_STATE}/environment.yml"
+KLM_OWNERSHIP_FILE="${KLM_KLM_STATE}/ownership.json"
+
 BUNDLE_IMPORT_TEMP=""
 
 
@@ -25,28 +31,98 @@ trap cleanup EXIT
 
 
 usage() {
-    echo "Usage:"
-    echo "  klm start"
-    echo "  klm stop"
-    echo "  klm restart"
-    echo "  klm status"
-    echo "  klm logs"
-    echo "  klm shell"
-    echo
-    echo "  klm engine import"
-    echo "  klm engine list"
-    echo
-    echo "  klm bundles import"
-    echo "  klm bundles list"
-    echo "  klm bundles validate"
-    echo
-    echo "  klm env <system>"
-    echo "  klm env"
-    echo
-    echo "  klm version"
-    echo "  klm doctor"
-    echo "  klm reconcile"
-    echo "  klm reconcile --dry-run"
+    cat <<'EOF'
+KLM - Kratos Lifecycle Manager
+
+Usage:
+  klm <command>
+
+Engine:
+  klm engine import
+      Install or replace the KLM engine from staging.
+
+  klm engine image
+      Show the installed engine image and engine artifacts.
+
+  klm engine image cleanup
+      Remove unused KLM engine images, including KLM-labeled dangling
+      images left by same-version rebuilds. The active/current image is kept.
+
+Container:
+  klm start
+      Start KLM and ensure the Semaphore KLM project exists.
+
+  klm stop
+      Stop the KLM container.
+
+  klm restart
+      Recreate and restart the KLM container.
+
+  klm status
+      Show engine and container status.
+
+  klm logs
+      Follow KLM/Semaphore container logs.
+
+  klm shell
+      Open an interactive shell inside the KLM container.
+
+Bundles:
+  klm bundles import
+      Validate and install or replace every .bundle file in staging.
+      A staged copy replaces the installed copy even when the version is
+      unchanged. Bundle type decides the install location.
+
+  klm bundles list
+      Show installed capability, architecture, and environment bundles.
+
+  klm bundles validate
+      Validate installed bundles, dependencies, and desired-state structure.
+
+  klm bundles remove <name>
+      Remove an installed bundle and its retained artifact. Semaphore is not
+      changed until the next reconcile. A selected environment cannot be
+      removed until its selection is cleared.
+
+Environment:
+  klm env
+      Show the active environment/system and available systems.
+
+  klm env <system>
+      Select a system from an installed environment bundle.
+
+  klm env clear
+      Clear the active environment/system selection.
+
+State:
+  klm state show
+      Show KLM selection, ownership, Semaphore, TLS, and backup state.
+
+  klm state clean
+      Clear environment selection and stale KLM temporary state. Ownership,
+      Semaphore database, Key Store data, security keys, and TLS are kept.
+
+  klm state reset
+      Reset persistent KLM/Semaphore state for a fresh run. Installed engine,
+      bundles, environments, and staging artifacts are preserved.
+
+Reconciliation:
+  klm reconcile
+      Make Semaphore match the current KLM desired state.
+
+  klm reconcile --dry-run
+      Show planned changes without modifying Semaphore.
+
+Other:
+  klm version
+      Show the KLM engine version.
+
+  klm doctor
+      Validate KLM configuration and Semaphore connectivity.
+
+  klm help
+      Show this help.
+EOF
 }
 
 
@@ -445,6 +521,156 @@ list_engines() {
 }
 
 
+get_container_image_id() {
+    if ! container_exists; then
+        return 1
+    fi
+
+    podman inspect \
+        --format '{{.Image}}' \
+        "${KLM_CONTAINER}" \
+        2>/dev/null || true
+}
+
+
+get_engine_image_id() {
+    local image_ref="$1"
+
+    podman image inspect \
+        --format '{{.Id}}' \
+        "${image_ref}" \
+        2>/dev/null || true
+}
+
+
+cleanup_engine_images() {
+    local tagged_images=()
+    local candidate_ids=()
+    local protected_id=""
+    local container_id=""
+    local stored_tars=()
+    local stored_version=""
+    local stored_matches=()
+    local image
+    local image_id
+    local candidate_id
+    local removed=0
+
+    mapfile -t tagged_images < <(get_engine_images)
+
+    # Prefer the image actually backing the KLM container, even if stopped.
+    container_id="$(get_container_image_id || true)"
+    if [ -n "${container_id}" ]; then
+        protected_id="${container_id}"
+    fi
+
+    # If no container exists, use the single stored engine artifact to identify
+    # the current tag when possible.
+    if [ -z "${protected_id}" ]; then
+        if [ -d "${KLM_ENGINE}" ]; then
+            mapfile -t stored_tars < <(
+                find "${KLM_ENGINE}" \
+                    -maxdepth 1 \
+                    -type f \
+                    -name 'klm-engine-*.tar' \
+                    -print \
+                    | sort
+            )
+        fi
+
+        if [ "${#stored_tars[@]}" -eq 1 ]; then
+            stored_version="$(basename "${stored_tars[0]}")"
+            stored_version="${stored_version#klm-engine-}"
+            stored_version="${stored_version%.tar}"
+
+            for image in "${tagged_images[@]}"; do
+                if [[ "${image}" == *"/klm-engine:${stored_version}" ]] || \
+                   [[ "${image}" == "klm-engine:${stored_version}" ]]; then
+                    stored_matches+=("${image}")
+                fi
+            done
+
+            if [ "${#stored_matches[@]}" -eq 1 ]; then
+                protected_id="$(get_engine_image_id "${stored_matches[0]}")"
+            fi
+        fi
+    fi
+
+    # A single tagged engine image is unambiguous.
+    if [ -z "${protected_id}" ] && [ "${#tagged_images[@]}" -eq 1 ]; then
+        protected_id="$(get_engine_image_id "${tagged_images[0]}")"
+    fi
+
+    if [ -z "${protected_id}" ] && [ "${#tagged_images[@]}" -gt 1 ]; then
+        echo "ERROR: More than one tagged KLM engine image exists and KLM" >&2
+        echo "cannot determine which one should be preserved." >&2
+        printf '  %s\n' "${tagged_images[@]}" >&2
+        echo >&2
+        echo "Start the engine you want to keep, or leave one current engine" >&2
+        echo "artifact in ${KLM_ENGINE}, then retry." >&2
+        exit 1
+    fi
+
+    # Collect images explicitly tagged as klm-engine.
+    for image in "${tagged_images[@]}"; do
+        image_id="$(get_engine_image_id "${image}")"
+        if [ -n "${image_id}" ]; then
+            candidate_ids+=("${image_id}")
+        fi
+    done
+
+    # New engine images carry this label. It lets cleanup safely identify
+    # dangling images produced when the same version/tag is rebuilt.
+    while IFS= read -r image_id; do
+        [ -z "${image_id}" ] && continue
+        image_id="$(get_engine_image_id "${image_id}")"
+        [ -n "${image_id}" ] && candidate_ids+=("${image_id}")
+    done < <(
+        podman images \
+            --filter 'label=com.kratos.klm.component=engine' \
+            --format '{{.ID}}' \
+            2>/dev/null || true
+    )
+
+    if [ "${#candidate_ids[@]}" -eq 0 ]; then
+        echo "No KLM engine images found to clean."
+        return
+    fi
+
+    mapfile -t candidate_ids < <(printf '%s\n' "${candidate_ids[@]}" | sort -u)
+
+    echo "KLM engine image cleanup:"
+    if [ -n "${protected_id}" ]; then
+        echo "  Keeping: ${protected_id}"
+    else
+        echo "  No current KLM engine image is installed."
+    fi
+    echo
+
+    for candidate_id in "${candidate_ids[@]}"; do
+        if [ -n "${protected_id}" ] && [ "${candidate_id}" = "${protected_id}" ]; then
+            continue
+        fi
+
+        echo "Removing unused KLM engine image:"
+        echo "  ${candidate_id}"
+
+        if podman image rm "${candidate_id}"; then
+            removed=$((removed + 1))
+        else
+            echo "WARNING: Could not remove ${candidate_id}. It may still be in use." >&2
+        fi
+        echo
+    done
+
+    if [ "${removed}" -eq 0 ]; then
+        echo "No unused KLM engine images needed removal."
+    else
+        echo "Removed ${removed} unused KLM engine image(s)."
+    fi
+}
+
+
 import_bundles() {
     local bundle_files=()
     local records=()
@@ -697,6 +923,237 @@ PYBUNDLE
 }
 
 
+selected_environment_name() {
+    if [ ! -f "${KLM_SELECTION_FILE}" ]; then
+        return
+    fi
+
+    awk -F': *' '$1 == "environment" {print $2; exit}' "${KLM_SELECTION_FILE}"
+}
+
+
+remove_bundle() {
+    local name="${1:-}"
+    local bundle_path
+    local environment_path
+    local selected_environment
+
+    if [ -z "${name}" ]; then
+        echo "ERROR: Bundle name is required." >&2
+        echo "Usage: klm bundles remove <name>" >&2
+        exit 1
+    fi
+
+    if ! [[ "${name}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        echo "ERROR: Invalid bundle name '${name}'." >&2
+        exit 1
+    fi
+
+    bundle_path="${KLM_BUNDLES}/${name}"
+    environment_path="${KLM_ENVIRONMENTS}/${name}"
+
+    if [ -e "${bundle_path}" ] && [ -e "${environment_path}" ]; then
+        echo "ERROR: '${name}' exists in both bundles and environments." >&2
+        echo "Resolve the filesystem conflict before removing it." >&2
+        exit 1
+    fi
+
+    if [ -d "${environment_path}" ]; then
+        selected_environment="$(selected_environment_name)"
+
+        if [ "${selected_environment}" = "${name}" ]; then
+            echo "ERROR: Environment '${name}' is currently selected." >&2
+            echo "Run:" >&2
+            echo "  klm env clear" >&2
+            echo "before removing it." >&2
+            exit 1
+        fi
+
+        rm -rf "${environment_path}"
+        rm -f \
+            "${KLM_ENVIRONMENTS}/.artifacts/${name}-"*.bundle \
+            "${KLM_ENVIRONMENTS}/.artifacts/klm-env-${name}-"*.bundle \
+            2>/dev/null || true
+
+        echo "Removed environment bundle '${name}'."
+        echo "Run 'klm reconcile' to converge Semaphore to the new desired state."
+        return
+    fi
+
+    if [ -d "${bundle_path}" ]; then
+        rm -rf "${bundle_path}"
+        rm -f \
+            "${KLM_BUNDLES}/.artifacts/${name}-"*.bundle \
+            2>/dev/null || true
+
+        echo "Removed bundle '${name}'."
+        echo "Run 'klm reconcile' to converge Semaphore to the new desired state."
+        return
+    fi
+
+    echo "ERROR: Bundle '${name}' is not installed." >&2
+    exit 1
+}
+
+
+state_show() {
+    local environment=""
+    local system=""
+    local backup_count=0
+
+    echo "KLM persistent state:"
+    echo
+
+    if [ -f "${KLM_SELECTION_FILE}" ]; then
+        environment="$(awk -F': *' '$1 == "environment" {print $2; exit}' "${KLM_SELECTION_FILE}")"
+        system="$(awk -F': *' '$1 == "system" {print $2; exit}' "${KLM_SELECTION_FILE}")"
+        echo "Selection:"
+        echo "  Environment: ${environment:-unknown}"
+        echo "  System:      ${system:-unknown}"
+    else
+        echo "Selection:"
+        echo "  none"
+    fi
+
+    echo
+    echo "Ownership:"
+    if [ -f "${KLM_OWNERSHIP_FILE}" ]; then
+        python3 - "${KLM_OWNERSHIP_FILE}" <<'PYSTATE'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+for key in ("projects", "repositories", "inventories", "views", "templates", "workflows"):
+    value = data.get(key, {})
+    print("  %-14s %d" % (key.capitalize() + ":", len(value) if isinstance(value, dict) else 0))
+PYSTATE
+        echo "  File:          ${KLM_OWNERSHIP_FILE}"
+    else
+        echo "  none"
+    fi
+
+    echo
+    echo "Semaphore:"
+    if [ -f "${KLM_SEMAPHORE_STATE}/database.sqlite" ]; then
+        echo "  Database:      present ($(du -h "${KLM_SEMAPHORE_STATE}/database.sqlite" | awk '{print $1}'))"
+    else
+        echo "  Database:      not initialized"
+    fi
+
+    if [ -f "${KLM_SEMAPHORE_STATE}/secrets.env" ]; then
+        echo "  Security keys: present"
+    else
+        echo "  Security keys: not initialized"
+    fi
+
+    echo
+    echo "TLS:"
+    if [ -f "${KLM_TLS_STATE}/klm.crt" ] && [ -f "${KLM_TLS_STATE}/klm.key" ]; then
+        echo "  Certificate/key: present"
+    else
+        echo "  Certificate/key: not initialized"
+    fi
+
+    if [ -d "${KLM_STATE}/backups" ]; then
+        backup_count="$(find "${KLM_STATE}/backups" -mindepth 1 -maxdepth 1 -type d | wc -l)"
+    fi
+
+    echo
+    echo "Database backups:"
+    echo "  ${backup_count}"
+}
+
+
+state_clean() {
+    mkdir -p "${KLM_KLM_STATE}"
+    chown 1000:1000 "${KLM_KLM_STATE}"
+
+    rm -f \
+        "${KLM_SELECTION_FILE}" \
+        "${KLM_KLM_STATE}"/*.tmp \
+        2>/dev/null || true
+
+    echo "KLM state cleanup complete."
+    echo
+    echo "Cleared:"
+    echo "  environment/system selection"
+    echo "  stale KLM temporary state"
+    echo
+    echo "Preserved:"
+    echo "  ownership state"
+    echo "  Semaphore database and Key Store data"
+    echo "  Semaphore security keys"
+    echo "  TLS certificate/key"
+}
+
+
+state_reset() {
+    local assume_yes="${1:-}"
+    local answer=""
+
+    if [ -n "${assume_yes}" ] && [ "${assume_yes}" != "--yes" ]; then
+        echo "ERROR: Unknown option '${assume_yes}'." >&2
+        echo "Usage: klm state reset [--yes]" >&2
+        exit 1
+    fi
+
+    if [ "${assume_yes}" != "--yes" ]; then
+        cat <<'EOF'
+WARNING: This will remove all persistent KLM/Semaphore runtime state.
+
+This includes:
+  - Semaphore database, users, project, inventories, templates, and Key Store data
+  - KLM ownership and environment selection
+  - Semaphore security keys
+  - KLM TLS certificate/key
+  - KLM state backups
+
+Preserved:
+  - installed KLM engine image/artifact
+  - installed bundles and environments
+  - staging artifacts
+
+Continue? [y/N]:
+EOF
+        read -r answer
+        case "${answer}" in
+            y|Y|yes|YES) ;;
+            *)
+                echo "State reset cancelled."
+                return
+                ;;
+        esac
+    fi
+
+    if container_exists; then
+        echo "Removing KLM container..."
+        podman rm -f "${KLM_CONTAINER}" >/dev/null
+    fi
+
+    rm -rf "${KLM_STATE}"
+
+    # An API token tied to the old Semaphore database is no longer valid.
+    rm -f "${KLM_SECRETS}/semaphore_api_token"
+
+    mkdir -p \
+        "${KLM_KLM_STATE}" \
+        "${KLM_SEMAPHORE_STATE}" \
+        "${KLM_TLS_STATE}"
+
+    chown -R 1000:1000 "${KLM_STATE}"
+
+    echo
+    echo "KLM persistent state reset complete."
+    echo "Installed engine and bundles were preserved."
+    echo
+    echo "Next:"
+    echo "  klm start"
+}
+
+
 case "${1:-}" in
 
     start)
@@ -730,8 +1187,17 @@ case "${1:-}" in
                 import_engine
                 ;;
 
-            list)
-                list_engines
+            image|list)
+                if [ "${3:-}" = "cleanup" ]; then
+                    cleanup_engine_images
+                elif [ -n "${3:-}" ]; then
+                    echo "Usage:" >&2
+                    echo "  klm engine image" >&2
+                    echo "  klm engine image cleanup" >&2
+                    exit 1
+                else
+                    list_engines
+                fi
                 ;;
 
             *)
@@ -743,11 +1209,25 @@ case "${1:-}" in
         ;;
 
     bundles)
-        if [ "${2:-}" = "import" ]; then
-            import_bundles
-        else
-            run_engine_command "$@"
-        fi
+        case "${2:-}" in
+            import)
+                import_bundles
+                ;;
+            remove)
+                remove_bundle "${3:-}"
+                ;;
+            list|validate)
+                run_engine_command "$@"
+                ;;
+            *)
+                echo "Usage:" >&2
+                echo "  klm bundles import" >&2
+                echo "  klm bundles list" >&2
+                echo "  klm bundles validate" >&2
+                echo "  klm bundles remove <name>" >&2
+                exit 1
+                ;;
+        esac
         ;;
 
     env)
@@ -758,6 +1238,31 @@ case "${1:-}" in
         else
             run_engine_command "$@"
         fi
+        ;;
+
+    state)
+        case "${2:-}" in
+            show)
+                state_show
+                ;;
+            clean)
+                state_clean
+                ;;
+            reset)
+                state_reset "${3:-}"
+                ;;
+            *)
+                echo "Usage:" >&2
+                echo "  klm state show" >&2
+                echo "  klm state clean" >&2
+                echo "  klm state reset [--yes]" >&2
+                exit 1
+                ;;
+        esac
+        ;;
+
+    help|-h|--help|"")
+        usage
         ;;
 
     *)

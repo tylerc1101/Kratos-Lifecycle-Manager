@@ -20,7 +20,7 @@ import workflows
 from client import DRY_RUN_ID, SemaphoreApiError, SemaphoreClient
 from errors import ReconcileError
 
-KLM_VERSION = "1.2.2"
+KLM_VERSION = "1.2.3"
 LOG = logging.getLogger("klm")
 
 
@@ -72,10 +72,12 @@ def command_bundles_list(args):
         print("No bundles installed.")
         return 0
 
+    print("%-20s %-10s %-13s %s" % ("NAME", "VERSION", "TYPE", "STATUS"))
+
     for bundle in installed:
         enabled = "enabled" if bundle.enabled else "disabled"
         print(
-            "%-20s %-10s %-12s %s"
+            "%-20s %-10s %-13s %s"
             % (
                 bundle.name,
                 bundle.version,
@@ -84,9 +86,10 @@ def command_bundles_list(args):
             )
         )
 
-        for system in bundle.systems:
+        for index, system in enumerate(bundle.systems):
             system_state = "enabled" if system.enabled else "disabled"
-            print("  system %-18s %s" % (system.name, system_state))
+            branch = "└─" if index == len(bundle.systems) - 1 else "├─"
+            print("  %s %-36s %s" % (branch, system.name, system_state))
 
     return 0
 
@@ -216,11 +219,26 @@ def command_env(args):
         settings_module.DEFAULT_PROJECT_NAME,
     ).strip()
 
+    requested_system = str(args.system or "").strip()
+
+    if requested_system.lower() == "clear":
+        previous = environment_selection.load_selection(
+            selection_file, required=False
+        )
+        if previous is None:
+            print("Environment selection is already clear.")
+            return 0
+
+        environment_selection.clear_selection(selection_file)
+        print("Environment selection cleared.")
+        print("Previous: %s / %s" % (previous.environment, previous.system))
+        return 0
+
     environments = environment_selection.discover_environment_bundles(
         environment_dir
     )
 
-    if not args.system:
+    if not requested_system:
         current = environment_selection.load_selection(
             selection_file, required=False
         )
@@ -247,7 +265,7 @@ def command_env(args):
         return 0
 
     environment_bundle, selected_system = environment_selection.find_system(
-        environments, args.system
+        environments, requested_system
     )
 
     # Validate the complete dependency graph and every cross-bundle reference
@@ -736,7 +754,7 @@ def build_parser():
         "system",
         nargs="?",
         default="",
-        help="System to select, for example: SKCT2",
+        help="System to select, for example: SKCT2, or 'clear' to clear selection",
     )
     env.set_defaults(
         func=command_env,

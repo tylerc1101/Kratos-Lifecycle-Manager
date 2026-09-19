@@ -2,6 +2,8 @@ FROM platform-one-ironbank-docker-remote.bits.devops.kratosdefense.com/ironbank/
 
 ARG EXTRA_PACKAGES=""
 
+LABEL com.kratos.klm.component="engine"
+
 USER root
 
 
