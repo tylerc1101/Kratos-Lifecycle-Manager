@@ -1,17 +1,39 @@
-# Contract-level resources shared by every AFCGI system.
+# ============================================================
+# AFCGI Semaphore Configuration
+# ============================================================
+
 repositories:
   - name: AFCGI Environment
     url: file:///opt/openspace/environments/afcgi
     branch: main
 
-# Profiles are reusable system recipes. KLM 1.3.0 expands the selected
-# profile using these placeholders:
-#   {system}       -> SKCT2
-#   {system_lower} -> skct2
-#   {profile}      -> ground
-#   {environment}  -> afcgi
+
+# ============================================================
+# Reusable Site Profiles
+# ============================================================
+
 profiles:
+
+  # ==========================================================
+  # Ground
+  #
+  # Used by:
+  #   SKCT1
+  #   SKCT2
+  #   SKCT3
+  #   GEP1
+  #   GEP2
+  #
+  # KLM expands:
+  #
+  #   {system}        -> SKCT2
+  #   {system_lower}  -> skct2
+  #   {profile}       -> ground
+  #   {environment}   -> afcgi
+  # ==========================================================
+
   ground:
+
     inventories:
       - name: "{system}"
         type: file
@@ -20,88 +42,150 @@ profiles:
         ssh_key: AFCGI SSH User
         become_key: AFCGI Root
 
+
+    # ========================================================
+    # Site View
+    # ========================================================
+
     views:
       - name: "{system}"
 
+
+    # ========================================================
+    # AFCGI-Specific Tasks
+    # ========================================================
+
     templates:
-      - name: "{system} Setup Host"
-        description: Apply AFCGI host-specific configuration before reusable automation runs.
+
+      - name: "{system} MGMT KVM Networking"
+        description: Configure AFCGI-specific networking on the management KVM host.
         view: "{system}"
         repository: AFCGI Environment
         inventory: "{system}"
-        playbook: playbooks/setup-host.yml
+        playbook: playbooks/mgmt-kvm-networking.yml
+
+      - name: "{system} Stage Repositories"
+        description: Stage AFCGI repository configuration for the ground deployment.
+        view: "{system}"
+        repository: AFCGI Environment
+        inventory: "{system}"
+        playbook: playbooks/stage-repos.yml
 
       - name: "{system} Change OPNSense Settings"
-        description: Apply AFCGI/site-specific OPNSense changes after the BaseKit baseline.
+        description: Apply AFCGI-specific changes to the generated OPNSense configuration.
         view: "{system}"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/change-opnsense-settings.yml
 
+
+    # ========================================================
+    # Ground Installation Workflow
+    # ========================================================
+
     workflows:
+
       - name: "Install {system}"
-        description: Complete AFCGI ground installation using the shared ground profile.
+        description: Complete AFCGI Ground installation for {system}.
         view: "{system}"
+
         nodes:
-          - id: setup_mgmt_kvm
-            type: task
-            template: "{system} Setup Host"
-            task_params:
-              params:
-                limit:
-                  - mgmt-kvm
 
-          - id: generate_ssh_key
-            type: task
-            template: basekit::Generate SSH Key
+          # ==================================================
+          # Infrastructure Setup
+          # ==================================================
 
-          - id: push_ssh_key_mgmt
+          - id: mgmt_kvm_networking
             type: task
-            template: basekit::Push SSH Key
-            task_params:
-              params:
-                limit:
-                  - mgmt-kvm
+            template: "{system} MGMT KVM Networking"
+
+          - id: stage_repositories
+            type: task
+            template: "{system} Stage Repositories"
 
           - id: bootstrap_mgmt_kvm
             type: task
             template: basekit::Bootstrap MGMT KVM
 
-          - id: configure_opnsense
+          - id: prepare_opnsense
             type: task
-            template: basekit::Configure OPNSense
+            template: basekit::Prepare OPNSense
 
           - id: change_opnsense_settings
             type: task
             template: "{system} Change OPNSense Settings"
 
-          - id: copy_opnsense_config
-            type: task
-            template: basekit::Copy OPNSense Config
-
           - id: install_opnsense
             type: task
             template: basekit::Install OPNSense
 
-          - id: deploy_vms
+          - id: stage_rhel_image
+            type: task
+            template: basekit::Stage RHEL Image
+
+
+          # --------------------------------------------------
+          # MCM
+          # --------------------------------------------------
+
+          - id: deploy_mcm
             type: task
             template: basekit::Deploy VMs
-
-          - id: setup_mcm
-            type: task
-            template: "{system} Setup Host"
             task_params:
               params:
                 limit:
                   - mcm
 
-          - id: push_ssh_key_mcm
+          - id: bootstrap_mcm
             type: task
-            template: basekit::Push SSH Key
+            template: basekit::Bootstrap Nodes
             task_params:
               params:
                 limit:
                   - mcm
+
+
+          # --------------------------------------------------
+          # OSMS
+          # --------------------------------------------------
+
+          - id: deploy_osms
+            type: task
+            template: basekit::Deploy VMs
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: bootstrap_osms
+            type: task
+            template: basekit::Bootstrap Nodes
+            task_params:
+              params:
+                limit:
+                  - osms
+
+
+          # --------------------------------------------------
+          # OSDC
+          # --------------------------------------------------
+
+          - id: bootstrap_osdc
+            type: task
+            template: basekit::Bootstrap Nodes
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+
+          # ==================================================
+          # Onboarder Deployment
+          # ==================================================
+
+          - id: generate_ssh_key
+            type: task
+            template: onboarder::Generate SSH Key
 
           - id: prep_mcm
             type: task
@@ -110,6 +194,18 @@ profiles:
               params:
                 limit:
                   - mcm
+
+          - id: push_ssh_key_mcm
+            type: task
+            template: onboarder::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: prep_onboarder_container
+            type: task
+            template: onboarder::Prep Container
 
           - id: deploy_kubernetes
             type: task
@@ -131,21 +227,10 @@ profiles:
             type: task
             template: onboarder::Deploy ArgoCD
 
-          - id: setup_osms
-            type: task
-            template: "{system} Setup Host"
-            task_params:
-              params:
-                limit:
-                  - osms
 
-          - id: push_ssh_key_osms
-            type: task
-            template: basekit::Push SSH Key
-            task_params:
-              params:
-                limit:
-                  - osms
+          # ==================================================
+          # OpenSpace Cluster - OSMS
+          # ==================================================
 
           - id: prep_osms
             type: task
@@ -155,31 +240,32 @@ profiles:
                 limit:
                   - osms
 
-          - id: deploy_osms
+          - id: push_ssh_key_osms
+            type: task
+            template: onboarder::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: deploy_osms_cluster
             type: task
             template: onboarder::Deploy OpenSpace Cluster
             task_params:
               arguments: '["-e", "openspace-osms"]'
 
-          - id: approve_osms
+          - id: approve_osms_cluster
             type: approval
             approval_message: Did the OSMS cluster deploy successfully?
 
-          - id: setup_osdc
-            type: task
-            template: "{system} Setup Host"
-            task_params:
-              params:
-                limit:
-                  - osdc
+          - id: approve_osms_argocd
+            type: approval
+            approval_message: Did Argo CD deploy the OSMS applications successfully?
 
-          - id: push_ssh_key_osdc
-            type: task
-            template: basekit::Push SSH Key
-            task_params:
-              params:
-                limit:
-                  - osdc
+
+          # ==================================================
+          # OpenSpace Cluster - OSDC
+          # ==================================================
 
           - id: prep_osdc
             type: task
@@ -189,25 +275,42 @@ profiles:
                 limit:
                   - osdc
 
-          - id: deploy_osdc
+          - id: push_ssh_key_osdc
+            type: task
+            template: onboarder::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          - id: deploy_osdc_cluster
             type: task
             template: onboarder::Deploy OpenSpace Cluster
             task_params:
               arguments: '["-e", "openspace-osdc"]'
 
-          - id: approve_osdc
+          - id: approve_osdc_cluster
             type: approval
             approval_message: Did the OSDC cluster deploy successfully?
+
+          - id: approve_osdc_argocd
+            type: approval
+            approval_message: Did Argo CD deploy the OSDC applications successfully?
 
           - id: post_osdc
             type: task
             template: onboarder::Post OSDC
 
-          - id: generate_config
+
+          # ==================================================
+          # OpenSpace Tooling
+          # ==================================================
+
+          - id: generate_openspace_config
             type: task
             template: openspace::Generate Config
 
-          - id: push_images
+          - id: push_openspace_images
             type: task
             template: openspace::Push Images
 
@@ -215,44 +318,68 @@ profiles:
             type: task
             template: openspace::Start OpenSpace
 
+
+        # ====================================================
+        # Workflow Order
+        # ====================================================
+
         edges:
-          - {from: setup_mgmt_kvm, to: generate_ssh_key, condition: on_success}
-          - {from: generate_ssh_key, to: push_ssh_key_mgmt, condition: on_success}
-          - {from: push_ssh_key_mgmt, to: bootstrap_mgmt_kvm, condition: on_success}
-          - {from: bootstrap_mgmt_kvm, to: configure_opnsense, condition: on_success}
-          - {from: configure_opnsense, to: change_opnsense_settings, condition: on_success}
-          - {from: change_opnsense_settings, to: copy_opnsense_config, condition: on_success}
-          - {from: copy_opnsense_config, to: install_opnsense, condition: on_success}
-          - {from: install_opnsense, to: deploy_vms, condition: on_success}
-          - {from: deploy_vms, to: setup_mcm, condition: on_success}
-          - {from: setup_mcm, to: push_ssh_key_mcm, condition: on_success}
-          - {from: push_ssh_key_mcm, to: prep_mcm, condition: on_success}
-          - {from: prep_mcm, to: deploy_kubernetes, condition: on_success}
+
+          # Infrastructure
+          - {from: mgmt_kvm_networking, to: stage_repositories, condition: on_success}
+          - {from: stage_repositories, to: bootstrap_mgmt_kvm, condition: on_success}
+          - {from: bootstrap_mgmt_kvm, to: prepare_opnsense, condition: on_success}
+          - {from: prepare_opnsense, to: change_opnsense_settings, condition: on_success}
+          - {from: change_opnsense_settings, to: install_opnsense, condition: on_success}
+          - {from: install_opnsense, to: stage_rhel_image, condition: on_success}
+
+          # VM Deployment
+          - {from: stage_rhel_image, to: deploy_mcm, condition: on_success}
+          - {from: deploy_mcm, to: bootstrap_mcm, condition: on_success}
+          - {from: bootstrap_mcm, to: deploy_osms, condition: on_success}
+          - {from: deploy_osms, to: bootstrap_osms, condition: on_success}
+          - {from: bootstrap_osms, to: bootstrap_osdc, condition: on_success}
+
+          # Onboarder
+          - {from: bootstrap_osdc, to: generate_ssh_key, condition: on_success}
+          - {from: generate_ssh_key, to: prep_mcm, condition: on_success}
+          - {from: prep_mcm, to: push_ssh_key_mcm, condition: on_success}
+          - {from: push_ssh_key_mcm, to: prep_onboarder_container, condition: on_success}
+          - {from: prep_onboarder_container, to: deploy_kubernetes, condition: on_success}
           - {from: deploy_kubernetes, to: deploy_harbor, condition: on_success}
           - {from: deploy_harbor, to: deploy_rancher, condition: on_success}
           - {from: deploy_rancher, to: deploy_gitea, condition: on_success}
           - {from: deploy_gitea, to: deploy_argocd, condition: on_success}
-          - {from: deploy_argocd, to: setup_osms, condition: on_success}
-          - {from: setup_osms, to: push_ssh_key_osms, condition: on_success}
-          - {from: push_ssh_key_osms, to: prep_osms, condition: on_success}
-          - {from: prep_osms, to: deploy_osms, condition: on_success}
-          - {from: deploy_osms, to: approve_osms, condition: on_success}
-          - {from: approve_osms, to: setup_osdc, condition: on_success}
-          - {from: setup_osdc, to: push_ssh_key_osdc, condition: on_success}
-          - {from: push_ssh_key_osdc, to: prep_osdc, condition: on_success}
-          - {from: prep_osdc, to: deploy_osdc, condition: on_success}
-          - {from: deploy_osdc, to: approve_osdc, condition: on_success}
-          - {from: approve_osdc, to: post_osdc, condition: on_success}
-          - {from: post_osdc, to: generate_config, condition: on_success}
-          - {from: generate_config, to: push_images, condition: on_success}
-          - {from: push_images, to: start_openspace, condition: on_success}
 
-  # Cloud gets a separate dependency set. No cloud workflow is invented here;
-  # add AFCGI cloud orchestration when the AWS install sequence is defined.
+          # OSMS
+          - {from: deploy_argocd, to: prep_osms, condition: on_success}
+          - {from: prep_osms, to: push_ssh_key_osms, condition: on_success}
+          - {from: push_ssh_key_osms, to: deploy_osms_cluster, condition: on_success}
+          - {from: deploy_osms_cluster, to: approve_osms_cluster, condition: on_success}
+          - {from: approve_osms_cluster, to: approve_osms_argocd, condition: on_success}
+
+          # OSDC
+          - {from: approve_osms_argocd, to: prep_osdc, condition: on_success}
+          - {from: prep_osdc, to: push_ssh_key_osdc, condition: on_success}
+          - {from: push_ssh_key_osdc, to: deploy_osdc_cluster, condition: on_success}
+          - {from: deploy_osdc_cluster, to: approve_osdc_cluster, condition: on_success}
+          - {from: approve_osdc_cluster, to: approve_osdc_argocd, condition: on_success}
+          - {from: approve_osdc_argocd, to: post_osdc, condition: on_success}
+
+          # OpenSpace
+          - {from: post_osdc, to: generate_openspace_config, condition: on_success}
+          - {from: generate_openspace_config, to: push_openspace_images, condition: on_success}
+          - {from: push_openspace_images, to: start_openspace, condition: on_success}
+
+
+  # ==========================================================
+  # Cloud
+  # ==========================================================
+
   cloud:
     views:
       - name: "{system}"
 
-# Optional per-system additions belong here when one site truly differs from
-# its profile. Shared SKCT/GEP logic should remain under profiles.ground.
+
+# Site-specific additions can still go here later.
 systems: {}

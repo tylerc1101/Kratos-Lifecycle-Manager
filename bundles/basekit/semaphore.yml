@@ -1,51 +1,38 @@
-repositories:
-  - name: BaseKit
-    url: file:///opt/openspace/bundles/basekit
-    branch: main
-
-views:
-  - name: BaseKit
-
 templates:
-  - name: Generate SSH Key
-    description: Generate the SSH key material used during BaseKit installation.
-    view: BaseKit
-    repository: BaseKit
-    playbook: playbooks/generate-ssh-key.yml
-
-  - name: Push SSH Key
-    description: Push the generated SSH key to selected hosts.
-    view: BaseKit
-    repository: BaseKit
-    playbook: playbooks/push-ssh-key.yml
 
   - name: Bootstrap MGMT KVM
-    description: Bootstrap the management KVM host.
+    description: Perform the initial BaseKit configuration of the management KVM host.
     view: BaseKit
     repository: BaseKit
     playbook: playbooks/bootstrap-mgmt-kvm.yml
 
-  - name: Configure OPNSense
-    description: Configure the reusable BaseKit OPNSense baseline.
+  - name: Prepare OPNSense
+    description: Stage OPNSense installation content and generate the baseline config.xml.
     view: BaseKit
     repository: BaseKit
-    playbook: playbooks/configure-opnsense.yml
-
-  - name: Copy OPNSense Config
-    description: Copy the generated OPNSense configuration into place.
-    view: BaseKit
-    repository: BaseKit
-    playbook: playbooks/copy-opnsense-config.yml
+    playbook: playbooks/prepare-opnsense.yml
 
   - name: Install OPNSense
-    description: Run the BaseKit OPNSense installation script.
+    description: Deploy the OPNSense virtual machine.
     view: BaseKit
     repository: BaseKit
     app: bash
     playbook: scripts/install_opnsense.sh
 
+  - name: Stage RHEL Image
+    description: Stage the RHEL golden image on the management KVM host.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/stage-rhel-image.yml
+
   - name: Deploy VMs
-    description: Deploy the BaseKit virtual machines.
+    description: Deploy requested BaseKit virtual machines.
     view: BaseKit
     repository: BaseKit
     playbook: playbooks/deploy-vms.yml
+
+  - name: Bootstrap Nodes
+    description: Configure newly deployed nodes with hostname, repositories, NTP, and baseline settings.
+    view: BaseKit
+    repository: BaseKit
+    playbook: playbooks/bootstrap-nodes.yml

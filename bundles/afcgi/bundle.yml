@@ -9,7 +9,7 @@ profiles:
     description: Shared installation profile for SKCT and GEP ground systems
     requires:
       - name: basekit
-        version: 1.0.0
+        version: 1.1.0
 
   - name: cloud
     description: Cloud installation profile. AWS-specific workflow content can be added later.

@@ -1,17 +1,28 @@
-repositories:
-  - name: Onboarder
-    url: file:///opt/openspace/bundles/onboarder
-    branch: main
-
-views:
-  - name: Onboarder Tools
-
 templates:
+
+  - name: Generate SSH Key
+    description: Generate the SSH key used by the Onboarder deployment.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/generate-ssh-key.yml
+
   - name: Node Prep
-    description: Prepare a node for Kubernetes/OpenSpace deployment.
+    description: Prepare a node for Kubernetes or OpenSpace deployment.
     view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/node-prep.yml
+
+  - name: Push SSH Key
+    description: Deploy the Onboarder SSH public key to selected nodes.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/push-ssh-key.yml
+
+  - name: Prep Container
+    description: Prepare the Onboarder deployment container and configuration.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: actions/container/prep-container.yml
 
   - name: Deploy Kubernetes
     description: Deploy the management Kubernetes cluster.
@@ -49,7 +60,7 @@ templates:
     playbook: scripts/deploy-argocd.sh
 
   - name: Deploy OpenSpace Cluster
-    description: Deploy an OpenSpace cluster using the supplied script arguments.
+    description: Deploy an OpenSpace Kubernetes cluster.
     view: Onboarder Tools
     repository: Onboarder
     app: bash
@@ -57,7 +68,7 @@ templates:
     allow_override_args_in_task: true
 
   - name: Post OSDC
-    description: Perform post-deployment OSDC configuration.
+    description: Perform post-deployment configuration for the OSDC cluster.
     view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/post_osdc.yml
