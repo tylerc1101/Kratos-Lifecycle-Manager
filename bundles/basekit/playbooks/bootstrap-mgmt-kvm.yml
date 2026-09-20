@@ -4,6 +4,22 @@
   gather_facts: false
   become: true
 
+  pre_tasks:
+    - name: Load bundle variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars.yml"
+
+    - name: Apply environment bundle overrides
+      ansible.builtin.set_fact:
+        bundle: >-
+          {{
+            bundle_vars |
+            combine(
+              bundle_overrides | default({}),
+              recursive=true
+            )
+          }}
+
   tasks:
     # ============================================================
     # Set Hostname
@@ -11,6 +27,26 @@
     - name: Set system hostname from inventory
       ansible.builtin.hostname:
         name: "{{ inventory_hostname }}.{{ domain_name }}"
+
+    # ============================================================
+    # Repository Configuration
+    # ============================================================
+
+    - name: Deploy repository files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/etc/yum.repos.d/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      with_fileglob:
+        - "{{ klm_home }}/repos/*.repo"
+      register: repo_result
+
+    - name: Refresh DNF metadata
+      ansible.builtin.dnf:
+        update_cache: true
+      when: repo_result.changed
 
     # ============================================================
     # Package management
