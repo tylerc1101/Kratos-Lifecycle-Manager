@@ -59,21 +59,21 @@ profiles:
 
       - name: "{system} MGMT KVM Networking"
         description: Configure AFCGI-specific networking on the management KVM host.
-        view: "{system}"
+        view: "{system} Tasks"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/mgmt-kvm-networking.yml
 
       - name: "{system} Stage Repositories"
         description: Stage AFCGI repository configuration for the ground deployment.
-        view: "{system}"
+        view: "{system} Tasks"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/stage-repos.yml
 
       - name: "{system} Change OPNSense Settings"
         description: Apply AFCGI-specific changes to the generated OPNSense configuration.
-        view: "{system}"
+        view: "{system} Tasks"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/change-opnsense-settings.yml
@@ -87,7 +87,7 @@ profiles:
 
       - name: "Install {system}"
         description: Complete AFCGI Ground installation for {system}.
-        view: "{system}"
+        view: "{system} Tasks"
 
         nodes:
 

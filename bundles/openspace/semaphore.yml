@@ -4,25 +4,25 @@ repositories:
     branch: main
 
 views:
-  - name: OpenSpace Tools
+  - name: OpenSpace Tasks
 
 templates:
   - name: Generate Config
     description: Generate the OpenSpace configuration for the selected system.
-    view: OpenSpace Tools
+    view: OpenSpace Tasks
     repository: OpenSpace
     playbook: playbooks/generate-config.yml
 
   - name: Push Images
     description: Push OpenSpace images to the target environment.
-    view: OpenSpace Tools
+    view: OpenSpace Tasks
     repository: OpenSpace
     app: bash
     playbook: scripts/push-images.sh
 
   - name: Start OpenSpace
     description: Start the OpenSpace deployment.
-    view: OpenSpace Tools
+    view: OpenSpace Tasks
     repository: OpenSpace
     app: bash
     playbook: scripts/start.sh
