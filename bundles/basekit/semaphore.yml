@@ -1,3 +1,11 @@
+repositories:
+  - name: BaseKit
+    url: file:///opt/openspace/bundles/basekit
+    branch: main
+
+views:
+  - name: BaseKit Tasks
+
 templates:
 
   - name: Bootstrap MGMT KVM

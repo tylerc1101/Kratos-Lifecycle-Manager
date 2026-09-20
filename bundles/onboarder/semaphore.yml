@@ -1,3 +1,11 @@
+repositories:
+  - name: Onboarder
+    url: file:///opt/openspace/bundles/onboarder
+    branch: main
+
+views:
+  - name: Onboarder Tasks
+
 templates:
 
   - name: Generate SSH Key
