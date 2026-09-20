@@ -1,0 +1,45 @@
+---
+- name: Generate SSH key
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+
+  tasks:
+    - name: Create .ssh directory
+      ansible.builtin.file:
+        path: "{{ klm_home }}/.ssh"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Check if SSH private key exists
+      ansible.builtin.stat:
+        path: "{{ klm_home }}/.ssh/{{ ssh_key }}"
+      register: ssh_private_key
+
+    - name: Generate SSH key
+      ansible.builtin.command:
+        cmd: >
+          ssh-keygen
+          -t rsa
+          -b 4096
+          -f {{ klm_home }}/.ssh/{{ ssh_key }}
+          -N ""
+          -C "{{ ssh_key }}"
+      when: not ssh_private_key.stat.exists
+
+    - name: Set private key permissions
+      ansible.builtin.file:
+        path: "{{ klm_home }}/.ssh/{{ ssh_key }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Set public key permissions
+      ansible.builtin.file:
+        path: "{{ klm_home }}/.ssh/{{ ssh_key }}.pub"
+        owner: root
+        group: root
+        mode: "0644"

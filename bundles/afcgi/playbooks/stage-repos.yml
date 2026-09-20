@@ -1,0 +1,16 @@
+---
+- name: Stage repository configuration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Stage repository files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ klm_home }}/repos/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      with_fileglob:
+        - "{{ playbook_dir }}/../repos/*.repo"

@@ -1,0 +1,77 @@
+---
+bundle_vars:
+
+  # ============================================================
+  # Network Interfaces / Bridges
+  # ============================================================
+
+  wan_interface: eno12409
+  wan_bridge: br-wan
+
+  mgmt_network: 192.168.2.0/24
+  mgmt_cidr: 24
+  mgmt_gateway: 192.168.2.1
+  mgmt_dns: 192.168.2.1
+
+  mgmt_interface: eno12399
+  mgmt_bridge: br-mgmt
+  mgmt_address: 192.168.2.6/24
+
+  mgmt_interface: eno12399
+  mgmt_bridge: br-mgmt
+  mgmt_address: 192.168.2.6/24
+
+  idrac_interface: ens3f0
+  idrac_bridge: br-iDRAC
+  idrac_address: 192.168.0.4/24
+
+
+  # ============================================================
+  # Libvirt
+  # ============================================================
+
+  libvirt:
+    qemu_user: qemu
+    qemu_group: qemu
+
+    dirs:
+      root: /var/lib/libvirt
+      images: /var/lib/libvirt/images
+      config: /var/lib/libvirt/config
+      config_images: /var/lib/libvirt/config/images
+      vm_config: /var/lib/libvirt/config/vm_config
+      opnsense: /var/lib/libvirt/config/vm_config/opnsense
+
+
+  # ============================================================
+  # VM Deployment
+  # ============================================================
+
+  vm:
+    image: RHEL9_8_26Q3.qcow2
+    os_variant: rhel9.8
+    network_bridge: br-mgmt
+
+    defaults:
+      mcm:
+        memory_mb: 16384
+        vcpus: 8
+
+      osms:
+        memory_mb: 32768
+        vcpus: 16
+
+
+  # ============================================================
+  # OPNsense
+  # ============================================================
+
+  opnsense:
+    hostname: opnsense
+    iso_name: OPNsense-24.7-dvd-amd64.iso
+    template_name: config_template.xml
+
+    interfaces:
+      wan: vtnet1
+      lan: vtnet0
+      opt1: vtnet2

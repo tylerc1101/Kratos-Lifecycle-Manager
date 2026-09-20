@@ -1,0 +1,67 @@
+
+- name: Prepare OpenSpace nodes
+  hosts: mcm,osms,osdc
+  gather_facts: false
+  become: true
+
+  tasks:
+
+    # ============================================================
+    # Connectivity
+    # ============================================================
+
+    - name: Wait for SSH connectivity
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 900
+
+
+    # ============================================================
+    # Repository Configuration
+    # ============================================================
+
+    - name: Deploy repository files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/etc/yum.repos.d/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0644"
+      with_fileglob:
+        - "{{ klm_home }}/repos/*.repo"
+      register: repo_result
+
+    - name: Refresh DNF metadata
+      ansible.builtin.dnf:
+        update_cache: true
+      when: repo_result.changed
+
+
+    # ============================================================
+    # NTP Configuration
+    # ============================================================
+
+    - name: Deploy chrony configuration
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../templates/chrony.conf.j2"
+        dest: /etc/chrony.conf
+        owner: root
+        group: root
+        mode: "0644"
+      register: chrony_config
+
+    - name: Restart chronyd if configuration changed
+      ansible.builtin.systemd:
+        name: chronyd
+        state: restarted
+        enabled: true
+      when: chrony_config.changed
+
+
+    # ============================================================
+    # System Configuration
+    # ============================================================
+
+    - name: Set system hostname
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}.{{ domain_name }}"

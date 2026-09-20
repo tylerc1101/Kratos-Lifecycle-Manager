@@ -1,42 +1,106 @@
 ---
-- name: Destroy selected libvirt VMs
-  hosts: all
+- name: Destroy requested OpenSpace VMs
+  hosts: vms
   gather_facts: false
-  become: true
-  connection: local
   serial: 1
 
+  pre_tasks:
+    # ============================================================
+    # Load Bundle Configuration
+    # ============================================================
+
+    - name: Load bundle variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars.yml"
+
+    - name: Apply environment bundle overrides
+      ansible.builtin.set_fact:
+        bundle: >-
+          {{
+            bundle_vars |
+            combine(
+              bundle_overrides | default({}),
+              recursive=true
+            )
+          }}
+
   vars:
+    libvirt_host: "{{ groups['klm_host'][0] }}"
+
     vm_name: "{{ inventory_hostname }}"
 
+    vm_disk_path: >-
+      {{ bundle.libvirt.dirs.images }}/{{ inventory_hostname }}.qcow2
+
   tasks:
-    - name: Check if VM exists
-      ansible.builtin.command: virsh --connect qemu:///system dominfo "{{ vm_name }}"
-      register: vm_info
+
+    # ============================================================
+    # Check VM
+    # ============================================================
+
+    - name: Get list of existing VMs
+      ansible.builtin.command:
+        cmd: virsh list --all --name
+      register: existing_vms
       changed_when: false
-      failed_when: false
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Destroy running VM
-      ansible.builtin.command: virsh --connect qemu:///system destroy "{{ vm_name }}"
+    - name: Determine if VM exists
+      ansible.builtin.set_fact:
+        vm_exists: "{{ vm_name in existing_vms.stdout_lines }}"
+
+
+    # ============================================================
+    # Stop VM
+    # ============================================================
+
+    - name: Get VM state
+      ansible.builtin.command:
+        cmd: "virsh domstate {{ vm_name }}"
+      register: vm_state
+      changed_when: false
+      when: vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+    - name: Force stop VM
+      ansible.builtin.command:
+        cmd: "virsh destroy {{ vm_name }}"
       when:
-        - vm_info.rc == 0
-        - "'running' in vm_info.stdout"
-      register: destroy_result
-      changed_when: destroy_result.rc == 0
+        - vm_exists
+        - "'running' in vm_state.stdout"
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Undefine VM and remove storage
-      ansible.builtin.command: virsh --connect qemu:///system undefine "{{ vm_name }}" --remove-all-storage --nvram
-      when: vm_info.rc == 0
-      register: undefine_result
-      changed_when: undefine_result.rc == 0
-      failed_when: false
 
-    - name: Remove leftover disk if present
+    # ============================================================
+    # Remove VM Definition
+    # ============================================================
+
+    - name: Undefine VM and remove NVRAM
+      ansible.builtin.command:
+        cmd: "virsh undefine {{ vm_name }} --nvram"
+      when: vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+
+    # ============================================================
+    # Remove VM Disk
+    # ============================================================
+
+    - name: Check if VM disk exists
+      ansible.builtin.stat:
+        path: "{{ vm_disk_path }}"
+      register: vm_disk
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+    - name: Remove VM qcow2 overlay
       ansible.builtin.file:
-        path: "/var/lib/libvirt/images/{{ vm_name }}.qcow2"
+        path: "{{ vm_disk_path }}"
         state: absent
-
-    - name: Show result
-      ansible.builtin.debug:
-        msg: >-
-          VM {{ vm_name }} was {{ 'destroyed/undefined' if vm_info.rc == 0 else 'not present' }}.
+      when: vm_disk.stat.exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true

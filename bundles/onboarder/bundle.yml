@@ -1,5 +1,5 @@
 name: onboarder
-version: 1.0.0
+version: 3.9.0.1
 type: capability
 enabled: true
 description: Reusable Kubernetes and OpenSpace cluster onboarding automation

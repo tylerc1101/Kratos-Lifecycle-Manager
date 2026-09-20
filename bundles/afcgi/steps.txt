@@ -1,24 +1,7 @@
 Install OS on servers
 IP Servers
     MGMGT:
-        nmcli con del eno12409
-        nmcli con add type bridge \
-            ifname br-wan \
-            con-name br-wan
-        nmcli con mod br-wan \
-            ipv4.method manual \
-            ipv4.addresses 10.243.77.212/23 \
-            ipv4.gateway 10.243.76.1 \
-            ipv4.dns "10.243.25.50,10.243.25.53" \
-            ipv4.dns-search "~." \
-            ipv4.ignore-auto-dns yes \
-            ipv6.method disabled
-        nmcli con add type ethernet \
-            ifname eno12409 \
-            con-name eno12409 \
-            master br-wan \
-            slave-type bridge
-        nmcli con up br-wan
+        nmcli con mod eno12409 ipv4.method manual ipv4.addresses 10.243.77.212/23 ipv4.gateway 10.243.76.1
         nmcli con up eno12409
 
 	OSDC1 
@@ -37,35 +20,47 @@ Install KLM and Bundles then configure Semaphore on the MGMT-KVM
 Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the workflow is doing)
 
 
+# Infrastructure Setup
+[afcgi bundle] - mgmt-kvm-networking.yml    (Builds bridges on mgmt-kvm)
+[afcgi bundle] - stage-repos.yml            (Copies repo files to /opt/openspace/repos on mgmt-kvm)
+[basekit bundle] - bootstrap-mgmt-kvm.yml   (Initial setup of mgmt-kvm, installs packages, sets up repos, etc)
+[basekit bundle] - prepare-opnsense.yml     (Stages opnsense iso and creates config.xml)
+[afcgi bundle] - change-opnsense-settings.yml (AFCGI specific settings for opnsense)
+[basekit bundle] - install_opnsense.sh      (Deploys opnsense vm on mgmt-kvm)
+[basekit bundle] - stage-rhel-image.yml     (Stages rhel qcow2 image on mgmt-kvm)
+[basekit bundle] - deploy-vms.yml [limit=mcm] (Deploys MCM VM on mgmt-kvm and configures it)
+[basekit bundle] - bootstrap-nodes.yml [limit=mcm] (Deploys NTP and Repo files and sets hostname)
+[basekit bundle] - deploy-vms.yml [limit=osms]
+[basekit bundle] - bootstrap-nodes.yml [limit=osms]
+[basekit bundle] - bootstrap-nodes.yml [limit=osdc]
 
-[afcgi bundle] - setup-host.yml [limit=mgmt-kvm]
-[basekit bundle] - generate-ssh-key.yml
-[basekit bundle] - push-ssh-key.yml [limit=mgmt-kvm]
-[basekit bundle] - bootstrap-mgmt-kvm.yml
-[basekit bundle] - configure-opnsense.yml
-[afcgi bundle] - change-opnsense-settings.yml (Change farg for laptop)
-[basekit bundle] - copy-opnsense-config.yml
-[basekit bundle] - install_opnsense.sh
-[basekit bundle] - deploy-vms.yml
-[afcgi bundle] - setup-host.yml [limit=mcm]
-[basekit bundle] - push-ssh-key.yml [limit=mcm]
-[onboarder bundle] - node-prep.yml [limit=mcm]
+# Onboarder deployment
+[onboarder bundle] - generate-ssh-key.yml     (Creates ssh key for onboarder)
+[onboarder bundle] - node-prep.yml [limit=mcm]  (Prepares MCM node for onboarder deployment)
+[onboarder bundle] - push-ssh-key.yml [limit=mcm] (Pushes ssh key to mgmt-kvm)
+[onboarder bundle] - prep-container.yml       (Setups up deployment files for onboarder container)
 [onboarder bundle] - deploy-kubernetes.sh
 [onboarder bundle] - deploy-harbor.sh
 [onboarder bundle] - deploy-rancher.sh
 [onboarder bundle] - deploy-gitea.sh
 [onboarder bundle] - deploy-argocd.sh
-[afcgi bundle] - setup-host.yml [limit=osms]
-[basekit bundle] - push-ssh-key.yml [limit=osms]
+
+# Cluster deployment [OSMS]
 [onboarder bundle] - node-prep.yml [limit=osms]
+[onboarder bundle] - push-ssh-key.yml [limit=osms]
 [onboarder bundle] - deploy-openspace-cluster [-e openspace-osms]
 [onboarder bundle] - approval [Did the cluster deploy successfully?]
-[afcgi bundle] - setup-host.yml [limit=osdc]
-[basekit bundle] - push-ssh-key.yml [limit=osdc]
+[onboarder bundle] - approval [Did argo cd deploy apps successfully?]
+
+# Cluster Deployment [OSDC]
 [onboarder bundle] - node-prep.yml [limit=osdc]
+[onboarder bundle] - push-ssh-key.yml [limit=osdc]
 [onboarder bundle] - deploy-openspace-cluster [-e openspace-osdc]
 [onboarder bundle] - approval [Did the cluster deploy successfully?]
+[onboarder bundle] - approval [Did argo cd deploy apps successfully?]
 [onboarder bundle] - post_osdc.yml
+
+# Deploy tooling
 [openspace bundle] - generate-config.yml
 [openspace bundle] - push-images.sh
 [openspace bundle] - start.sh

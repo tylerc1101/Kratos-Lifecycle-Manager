@@ -5,12 +5,18 @@
   become: true
 
   tasks:
+    # ============================================================
+    # Set Hostname
+    # ============================================================
     - name: Set system hostname from inventory
-      hostname:
+      ansible.builtin.hostname:
         name: "{{ inventory_hostname }}.{{ domain_name }}"
 
+    # ============================================================
+    # Package management
+    # ============================================================
     - name: Install required packages
-      yum:
+      ansible.builtin.yum:
         name:
           - "@Development Tools"
           - "@Virtualization Platform"
@@ -30,20 +36,59 @@
           - libcdio
           - libguestfs
         state: present
-        disable_gpg_check: yes
+        disable_gpg_check: true
 
-    - name: Start/Enable services
-      systemd:
+    - name: Start and enable services
+      ansible.builtin.systemd:
         name: "{{ item }}"
         state: started
-        enabled: yes
+        enabled: true
       loop:
         - libvirtd
         - cockpit.socket
 
-    - name: Create sudoers entry for user
-      copy:
-        dest: /etc/sudoers.d/{{ ansible_user }}
-        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    # ============================================================
+    # Libvirt Configuration
+    # ============================================================
+
+    - name: Ensure libvirt directories exist
+      ansible.builtin.file:
+        path: "{{ item.value }}"
+        state: directory
+        mode: "0755"
+      loop: "{{ bundle.libvirt.dirs | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Set qemu ownership on libvirt images directory
+      ansible.builtin.file:
+        path: "{{ bundle.libvirt.dirs.images }}"
+        state: directory
+        owner: "{{ bundle.libvirt.qemu_user }}"
+        group: "{{ bundle.libvirt.qemu_group }}"
+        recurse: true
+
+    - name: Set SELinux file context for libvirt config directory
+      community.general.sefcontext:
+        target: "{{ bundle.libvirt.dirs.config }}(/.*)?"
+        setype: virt_image_t
+        state: present
+
+    - name: Restore SELinux contexts
+      ansible.builtin.command:
+        cmd: "restorecon -Rv {{ bundle.libvirt.dirs.config }}"
+      register: restore_config
+      changed_when: restore_config.stdout is search("Relabeled|reset")
+
+    # ============================================================
+    # Sudoers.d File
+    # ============================================================
+
+    - name: Create sudoers entry for OpenSpace user
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ openspace_user }}"
+        content: "{{ openspace_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
         mode: "0440"
         validate: "visudo -cf %s"

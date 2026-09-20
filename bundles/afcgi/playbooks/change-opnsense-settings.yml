@@ -1,8 +1,15 @@
 ---
-- name: Placeholder - AFCGI site-specific OPNSense settings
-  hosts: all
+- name: Update OPNsense configuration
+  hosts: klm_host
   gather_facts: false
+  become: true
+
+  vars:
+    opnsense_config: /var/lib/libvirt/config/vm_config/opnsense/config.xml
+
   tasks:
-    - name: Replace this placeholder before use
-      ansible.builtin.fail:
-        msg: "TODO: implement AFCGI site-specific OPNSense settings"
+    - name: Enable fargw in OPNsense config
+      ansible.builtin.replace:
+        path: "{{ opnsense_config }}"
+        regexp: '<fargw>0</fargw>'
+        replace: '<fargw>1</fargw>'

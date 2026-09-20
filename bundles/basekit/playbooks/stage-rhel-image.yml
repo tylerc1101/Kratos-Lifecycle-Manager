@@ -1,0 +1,38 @@
+---
+- name: Stage RHEL golden image
+  hosts: klm_host
+  gather_facts: false
+  become: true
+
+  pre_tasks:
+    - name: Load bundle variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars.yml"
+
+    - name: Apply environment bundle overrides
+      ansible.builtin.set_fact:
+        bundle: >-
+          {{
+            bundle_vars |
+            combine(
+              bundle_overrides | default({}),
+              recursive=true
+            )
+          }}
+
+  tasks:
+    - name: Copy RHEL golden image
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../images/{{ bundle.vm.image }}"
+        dest: "{{ bundle.libvirt.dirs.config_images }}/{{ bundle.vm.image }}"
+        owner: "{{ bundle.libvirt.qemu_user }}"
+        group: "{{ bundle.libvirt.qemu_group }}"
+        mode: "0644"
+
+    - name: Restore SELinux context on RHEL image
+      ansible.builtin.command:
+        cmd: >-
+          restorecon -v
+          {{ bundle.libvirt.dirs.config_images }}/{{ bundle.vm.image }}
+      register: restore_rhel_image
+      changed_when: restore_rhel_image.stdout is search("Relabeled|reset")

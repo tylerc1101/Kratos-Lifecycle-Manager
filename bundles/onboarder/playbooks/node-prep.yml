@@ -6,3 +6,13 @@
     - name: Replace this placeholder before use
       ansible.builtin.fail:
         msg: "TODO: implement Onboarder node prep"
+
+
+    - name: Create sudoers entry for OpenSpace user
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ openspace_user }}"
+        content: "{{ openspace_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: "visudo -cf %s"

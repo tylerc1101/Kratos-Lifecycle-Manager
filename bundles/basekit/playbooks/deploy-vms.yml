@@ -1,78 +1,180 @@
 ---
+# ==================================================================
+# Create OpenSpace VMs
+# ==================================================================
+
 - name: Create requested OpenSpace VMs
   hosts: vms
   gather_facts: false
-  become: true
-  connection: local
   serial: 1
 
+  pre_tasks:
+
+    # ============================================================
+    # Load Bundle Configuration
+    # ============================================================
+
+    - name: Load bundle variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars.yml"
+
+    - name: Apply environment bundle overrides
+      ansible.builtin.set_fact:
+        bundle: >-
+          {{
+            bundle_vars |
+            combine(
+              bundle_overrides | default({}),
+              recursive=true
+            )
+          }}
+
+    # ============================================================
+    # Validate Libvirt Host
+    # ============================================================
+
+    - name: Verify libvirt host is defined
+      ansible.builtin.assert:
+        that:
+          - groups['klm_host'] is defined
+          - groups['klm_host'] | length == 1
+        fail_msg: >-
+          Exactly one host must exist in the klm_host inventory group.
+
+    # ============================================================
+    # Determine VM Type
+    # ============================================================
+
+    - name: Determine VM type
+      ansible.builtin.set_fact:
+        vm_type: >-
+          {{
+            'mcm'
+            if 'mcm' in group_names
+            else 'osms'
+            if 'osms' in group_names
+            else 'unknown'
+          }}
+
+    - name: Verify VM type
+      ansible.builtin.assert:
+        that:
+          - vm_type != 'unknown'
+        fail_msg: >-
+          Unable to determine VM type for {{ inventory_hostname }}.
+          Host must belong to either the mcm or osms inventory group.
+
+    # ============================================================
+    # Build Effective VM Settings
+    # ============================================================
+
+    - name: Build VM settings
+      ansible.builtin.set_fact:
+        vm_settings: >-
+          {{
+            bundle.vm.defaults[vm_type] |
+            combine(
+              (host_overrides | default({})).get('vm', {}),
+              recursive=true
+            )
+          }}
+
   vars:
-    images_dir: /var/lib/libvirt/config/images
+    # Host where libvirt actually runs
+    libvirt_host: "{{ groups['klm_host'][0] }}"
 
-    mgmt_cidr: "24"
-    mgmt_gateway: "192.168.2.1"
-    mgmt_dns_servers: "192.168.2.1"
-
+    # VM identity
     vm_name: "{{ inventory_hostname }}"
-    vm_memory: "{{ libvirt_memory_mb }}"
-    vm_vcpus: "{{ libvirt_vcpus }}"
-    vm_backing_store: "/var/lib/libvirt/config/images/RHEL9_8_26Q3.qcow2"
-    vm_os_variant: "rhel9.8"
-    vm_network_bridge: "br-mgmt"
-    vm_mgmt_ip: "{{ ansible_host }}"
+    vm_ip: "{{ hostvars[inventory_hostname].ansible_host }}"
 
-    vm_ifcfg_dir: "/tmp/{{ vm_name }}-network"
+    # Golden image
+    vm_backing_store: >-
+      {{ bundle.libvirt.dirs.config_images }}/{{ bundle.vm.image }}
+
+    # VM overlay disk
+    vm_disk_path: >-
+      {{ bundle.libvirt.dirs.images }}/{{ inventory_hostname }}.qcow2
+
+    # Temporary files created on the libvirt host
+    vm_ifcfg_dir: "/tmp/{{ inventory_hostname }}-network"
     vm_ifcfg_file: "{{ vm_ifcfg_dir }}/ifcfg-enp1s0"
 
   tasks:
+
+    # ============================================================
+    # Validate Golden Image
+    # ============================================================
+
     - name: Check if backing image exists
       ansible.builtin.stat:
         path: "{{ vm_backing_store }}"
       register: backing_image_stat
-      failed_when: not backing_image_stat.stat.exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+    - name: Fail if backing image does not exist
+      ansible.builtin.fail:
+        msg: "Backing image does not exist: {{ vm_backing_store }}"
+      when: not backing_image_stat.stat.exists
+
+
+    # ============================================================
+    # Check Existing VM
+    # ============================================================
 
     - name: Get list of existing VMs
-      ansible.builtin.command: virsh list --all --name
+      ansible.builtin.command:
+        cmd: virsh list --all --name
       register: existing_vms
       changed_when: false
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Check if VM already exists
+    - name: Determine if VM already exists
       ansible.builtin.set_fact:
         vm_exists: "{{ vm_name in existing_vms.stdout_lines }}"
 
-    - name: Create VM XML
+
+    # ============================================================
+    # Create VM Disk
+    # ============================================================
+
+    - name: Check if VM disk already exists
+      ansible.builtin.stat:
+        path: "{{ vm_disk_path }}"
+      register: vm_disk_stat
+      when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+    - name: Create qcow2 overlay from golden image
       ansible.builtin.command:
         cmd: >
-          virt-install
-          --connect qemu:///system
-          --virt-type kvm
-          --name {{ vm_name }}
-          --memory {{ vm_memory }}
-          --vcpus {{ vm_vcpus }}
-          --cpu host-passthrough
-          --disk size={{ vm_disk_size }},backing_store="{{ vm_backing_store }}"
-          --os-variant {{ vm_os_variant }}
-          --network bridge={{ vm_network_bridge }},model=virtio
-          --import
-          --noautoconsole
-          --graphics vnc
-          --boot uefi
-          --print-xml
-      register: vm_xml
-      when: not vm_exists
+          qemu-img create
+          -f qcow2
+          -F qcow2
+          -b {{ vm_backing_store }}
+          {{ vm_disk_path }}
+      when:
+        - not vm_exists
+        - not vm_disk_stat.stat.exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Define VM
-      community.libvirt.virt:
-        command: define
-        xml: "{{ vm_xml.stdout }}"
+    - name: Set VM disk ownership
+      ansible.builtin.file:
+        path: "{{ vm_disk_path }}"
+        owner: "{{ bundle.libvirt.qemu_user }}"
+        group: "{{ bundle.libvirt.qemu_group }}"
+        mode: "0644"
       when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Get VM disk path
-      ansible.builtin.shell: |
-        virsh domblklist {{ vm_name }} | awk '$1 == "vda" {print $2}'
-      register: vm_disk
-      changed_when: false
-      when: not vm_exists
+
+    # ============================================================
+    # Configure VM Network
+    # ============================================================
 
     - name: Create temporary network config directory
       ansible.builtin.file:
@@ -80,8 +182,10 @@
         state: directory
         mode: "0755"
       when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Create network config
+    - name: Create VM network configuration
       ansible.builtin.copy:
         dest: "{{ vm_ifcfg_file }}"
         mode: "0644"
@@ -91,26 +195,75 @@
           NAME=static-enp1s0
           DEVICE=enp1s0
           ONBOOT=yes
-          IPADDR={{ vm_mgmt_ip }}
-          PREFIX={{ mgmt_cidr }}
-          GATEWAY={{ mgmt_gateway }}
-          DNS1={{ mgmt_dns_servers[0] }}
-          {% if mgmt_dns_servers | length > 1 %}
-          DNS2={{ mgmt_dns_servers[1] }}
-          {% endif %}
+          IPADDR={{ vm_ip }}
+          PREFIX={{ bundle.mgmt_cidr }}
+          GATEWAY={{ bundle.mgmt_gateway }}
+          DNS1={{ bundle.mgmt_dns }}
       when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Inject network config into VM disk
+    - name: Inject network configuration into VM disk
       ansible.builtin.command:
-        cmd: virt-copy-in -a {{ vm_disk.stdout }} {{ vm_ifcfg_file }} /etc/sysconfig/network-scripts/
+        cmd: >
+          virt-copy-in
+          -a {{ vm_disk_path }}
+          {{ vm_ifcfg_file }}
+          /etc/sysconfig/network-scripts/
       environment:
         LIBGUESTFS_BACKEND: direct
       when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
     - name: Remove temporary network config directory
       ansible.builtin.file:
         path: "{{ vm_ifcfg_dir }}"
         state: absent
+      when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+
+    # ============================================================
+    # Define VM
+    # ============================================================
+
+    - name: Generate VM XML
+      ansible.builtin.command:
+        cmd: >
+          virt-install
+          --connect qemu:///system
+          --virt-type kvm
+          --name {{ vm_name }}
+          --memory {{ vm_settings.memory_mb }}
+          --vcpus {{ vm_settings.vcpus }}
+          --cpu host-passthrough
+          --disk path={{ vm_disk_path }},format=qcow2,bus=virtio
+          --os-variant {{ bundle.vm.os_variant }}
+          --network bridge={{ bundle.vm.network_bridge }},model=virtio
+          --import
+          --noautoconsole
+          --graphics vnc
+          --boot uefi
+          --print-xml
+      register: vm_xml
+      when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+    - name: Define VM
+      community.libvirt.virt:
+        command: define
+        xml: "{{ vm_xml.stdout }}"
+      when: not vm_exists
+      delegate_to: "{{ libvirt_host }}"
+      become: true
+
+
+    # ============================================================
+    # Start VM
+    # ============================================================
 
     - name: Start VM
       community.libvirt.virt:
@@ -119,81 +272,16 @@
         autostart: true
       when: not vm_exists
       register: vm_start
+      delegate_to: "{{ libvirt_host }}"
+      become: true
 
-    - name: Wait for VM SSH to be available
+    - name: Wait for VM SSH port
       ansible.builtin.wait_for:
-        host: "{{ ansible_host | default(inventory_hostname) }}"
+        host: "{{ vm_ip }}"
         port: 22
-        delay: 120
+        delay: 30
         timeout: 900
       when:
         - vm_start is defined
         - vm_start.changed | default(false)
-
-
-- name: Prep Nodes
-  hosts: all
-  gather_facts: false
-  serial: 1
-
-  tasks:
-    - name: Verify SSH connectivity
-      ansible.builtin.command: echo "SSH_OK"
-      register: vm_ssh_test
-      until: vm_ssh_test.stdout is search("SSH_OK")
-      retries: 30
-      delay: 30
-      changed_when: false
-
-    - name: Check uptime to detect if hardening reboots are complete
-      ansible.builtin.command: cat /proc/uptime
-      register: vm_uptime_raw
-      until: (vm_uptime_raw.stdout.split()[0] | float) > 150
-      retries: 20
-      delay: 60
-      changed_when: false
-
-    - name: Create KLM repo file
-      yum_repository:
-        name: "{{ repo_item.key }}"
-        description: "{{ repo_item.value.name }}"
-        baseurl: "{{ repo_item.value.baseurl }}"
-        enabled: "{{ repo_item.value.enabled | default(1) | bool }}"
-        gpgcheck: "{{ repo_item.value.gpgcheck | default(1) | bool }}"
-        failovermethod: "{{ repo_item.value.failovermethod | default(omit) }}"
-        file: "{{ repo.file }}"
-        state: present
-      loop: "{{ repo.entries | dict2items }}"
-      loop_control:
-        loop_var: repo_item
-        label: "{{ repo_item.key }}"
-      register: repo_result
-
-    - name: Refresh DNF metadata
-      dnf:
-        update_cache: true
-      when: repo_result.changed
-
-    - name: Configure /etc/resolv.conf
-      copy:
-        dest: /etc/resolv.conf
-        owner: root
-        group: root
-        mode: "0644"
-        backup: true
-        content: |
-          # Managed by Ansible
-          {% for dns_server in networks.dns_servers %}
-          nameserver {{ dns_server }}
-          {% endfor %}
-
-    - name: Set system hostname from inventory
-      hostname:
-        name: "{{ hostname }}.{{ domain_name }}"
-
-    - name: Create sudoers entry for user
-      copy:
-        dest: /etc/sudoers.d/{{ ansible_user }}
-        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
-        mode: '0440'
-        validate: 'visudo -cf %s'
+      delegate_to: "{{ libvirt_host }}"

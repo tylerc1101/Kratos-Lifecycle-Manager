@@ -1,0 +1,207 @@
+---
+- name: Configure network bridges
+  hosts: klm_host
+  become: true
+
+  vars:
+    # ============================================================
+    # WAN
+    # ============================================================
+    wan_interface: eno12409
+    wan_bridge: br-wan
+
+    # ============================================================
+    # Management
+    # ============================================================
+    mgmt_interface: eno12399
+    mgmt_bridge: br-mgmt
+    mgmt_address: 192.168.2.6/24
+    mgmt_dns: 192.168.2.100
+
+    # ============================================================
+    # iDRAC
+    # ============================================================
+    idrac_interface: ens3f0
+    idrac_bridge: br-iDRAC
+    idrac_address: 192.168.0.4/24
+
+  tasks:
+
+    # ============================================================
+    # Existing Connections
+    # ============================================================
+
+    - name: Get NetworkManager connections
+      ansible.builtin.command:
+        cmd: nmcli -t -f NAME connection show
+      register: nm_connections
+      changed_when: false
+
+
+    # ============================================================
+    # WAN Bridge
+    # ============================================================
+
+    - name: Configure WAN bridge
+      when: wan_bridge not in nm_connections.stdout_lines
+      block:
+
+        - name: Create WAN bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con add
+              type bridge
+              ifname {{ wan_bridge }}
+              con-name {{ wan_bridge }}
+
+        - name: Configure WAN bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con mod {{ wan_bridge }}
+              ipv4.method manual
+              ipv4.addresses {{ ansible_host }}/{{ opnsense.cidr }}
+              ipv4.gateway {{ opnsense.gateway }}
+              ipv4.dns {{ wan_dns_servers | join(',') }}
+              ipv4.dns-search "~."
+              ipv4.ignore-auto-dns yes
+              ipv6.method disabled
+
+        - name: Delete bootstrap WAN connection
+          ansible.builtin.command:
+            cmd: "nmcli con del {{ wan_interface }}"
+          failed_when: false
+
+        - name: Add WAN interface to bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con add
+              type ethernet
+              ifname {{ wan_interface }}
+              con-name {{ wan_interface }}
+              master {{ wan_bridge }}
+              slave-type bridge
+
+        - name: Bring up WAN bridge
+          ansible.builtin.command:
+            cmd: "nmcli con up {{ wan_bridge }}"
+
+        - name: Bring up WAN interface
+          ansible.builtin.command:
+            cmd: "nmcli con up {{ wan_interface }}"
+
+    # ============================================================
+    # Verify WAN Connectivity
+    # ============================================================
+
+    - name: Wait for connection after WAN bridge change
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 120
+
+    - name: Verify WAN gateway connectivity
+      ansible.builtin.command:
+        cmd: "ping -c 3 {{ opnsense.gateway }}"
+      register: wan_ping
+      changed_when: false
+      retries: 5
+      delay: 5
+      until: wan_ping.rc == 0
+
+
+    # ============================================================
+    # Management Bridge
+    # ============================================================
+
+    - name: Configure management bridge
+      when: mgmt_bridge not in nm_connections.stdout_lines
+      block:
+
+        - name: Delete existing management interface connection
+          ansible.builtin.command:
+            cmd: "nmcli con del {{ mgmt_interface }}"
+          failed_when: false
+
+        - name: Create management bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con add
+              type bridge
+              ifname {{ mgmt_bridge }}
+              con-name {{ mgmt_bridge }}
+
+        - name: Configure management bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con mod {{ mgmt_bridge }}
+              ipv4.method manual
+              ipv4.addresses {{ mgmt_address }}
+              ipv4.dns {{ mgmt_dns }}
+              ipv4.dns-search "~{{ domain_name }}"
+              ipv4.ignore-auto-dns yes
+              ipv6.method disabled
+
+        - name: Add management interface to bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con add
+              type ethernet
+              ifname {{ mgmt_interface }}
+              con-name {{ mgmt_interface }}
+              master {{ mgmt_bridge }}
+              slave-type bridge
+
+        - name: Bring up management bridge
+          ansible.builtin.command:
+            cmd: "nmcli con up {{ mgmt_bridge }}"
+
+        - name: Bring up management interface
+          ansible.builtin.command:
+            cmd: "nmcli con up {{ mgmt_interface }}"
+
+
+    # ============================================================
+    # iDRAC Bridge
+    # ============================================================
+
+    - name: Configure iDRAC bridge
+      when: idrac_bridge not in nm_connections.stdout_lines
+      block:
+
+        - name: Delete existing iDRAC interface connection
+          ansible.builtin.command:
+            cmd: "nmcli con del {{ idrac_interface }}"
+          failed_when: false
+
+        - name: Create iDRAC bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con add
+              type bridge
+              ifname {{ idrac_bridge }}
+              con-name {{ idrac_bridge }}
+
+        - name: Configure iDRAC bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con mod {{ idrac_bridge }}
+              ipv4.method manual
+              ipv4.addresses {{ idrac_address }}
+              ipv6.method disabled
+
+        - name: Add iDRAC interface to bridge
+          ansible.builtin.command:
+            cmd: >
+              nmcli con add
+              type ethernet
+              ifname {{ idrac_interface }}
+              con-name {{ idrac_interface }}
+              master {{ idrac_bridge }}
+              slave-type bridge
+
+        - name: Bring up iDRAC bridge
+          ansible.builtin.command:
+            cmd: "nmcli con up {{ idrac_bridge }}"
+
+        - name: Bring up iDRAC interface
+          ansible.builtin.command:
+            cmd: "nmcli con up {{ idrac_interface }}"

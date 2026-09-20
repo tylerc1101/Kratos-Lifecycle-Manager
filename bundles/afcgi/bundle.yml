@@ -1,5 +1,5 @@
 name: afcgi
-version: 1.0.0
+version: 1.1.0
 type: environment
 enabled: true
 description: AFCGI contract environment containing ground and cloud systems

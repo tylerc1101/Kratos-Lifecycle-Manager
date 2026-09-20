@@ -1,5 +1,5 @@
 name: openspace
-version: 1.0.0
+version: 1.11.0-116.1
 type: capability
 enabled: true
 description: Reusable OpenSpace application deployment automation

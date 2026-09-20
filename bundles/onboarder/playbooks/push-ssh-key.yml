@@ -1,0 +1,12 @@
+---
+- name: Deploy SSH public key
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Add SSH public key for OpenSpace user
+      ansible.posix.authorized_key:
+        user: "{{ openspace_user }}"
+        state: present
+        key: "{{ lookup('file', klm_home + '/secrets/secrets/' + ssh_key + '.pub') }}"
+        manage_dir: true
