@@ -1,6 +1,6 @@
 ---
 # ==================================================================
-# Generate OPNsense Configuration
+# Generate and Stage OPNsense Configuration
 # ==================================================================
 
 - name: Generate OPNsense configuration
@@ -9,6 +9,7 @@
   gather_facts: false
 
   pre_tasks:
+
     # ============================================================
     # Load Bundle Configuration
     # ============================================================
@@ -29,57 +30,68 @@
           }}
 
   vars:
+    generated_dir: "{{ klm_home }}/state/generated"
+    output_file: "{{ generated_dir }}/config.xml"
     template_file: >-
       {{ playbook_dir }}/../templates/{{ bundle.opnsense.template_name }}
 
-    output_dir: "{{ klm_home }}/state/generated"
-
-    output_file: "{{ output_dir }}/config.xml"
-
   tasks:
+
+    # ============================================================
+    # Validate Environment DNS Configuration
+    # ============================================================
+
+    - name: Verify WAN DNS configuration is valid
+      ansible.builtin.assert:
+        that:
+          - wan_dns is defined
+          - wan_dns.servers is defined
+          - wan_dns.servers | length > 0
+        fail_msg: >-
+          wan_dns.servers must contain at least one DNS server for this
+          environment.
+
+    - name: Verify DNS forwarding entries have a usable server list
+      ansible.builtin.assert:
+        that:
+          - item.domain is defined
+          - item.domain | length > 0
+          - (item.servers | default(wan_dns.servers, true)) | length > 0
+        fail_msg: >-
+          DNS forwarding entry {{ item | to_nice_json }} does not have a
+          domain or usable DNS server list.
+      loop: "{{ wan_dns.forwarding | default([]) }}"
+      loop_control:
+        label: "{{ item.domain | default('undefined') }}"
+
     # ============================================================
     # Generate Configuration
     # ============================================================
 
-    - name: Ensure generated output directory exists
+    - name: Ensure generated configuration directory exists
       ansible.builtin.file:
-        path: "{{ output_dir }}"
+        path: "{{ generated_dir }}"
         state: directory
         mode: "0755"
 
-    - name: Read OPNsense configuration template
-      ansible.builtin.slurp:
-        src: "{{ template_file }}"
-      register: template_content
-
     - name: Generate OPNsense configuration
-      ansible.builtin.copy:
-        content: |
-          {{ template_content.content | b64decode |
-             regex_replace('__WAN_IP__', opnsense.wan_ip) |
-             regex_replace('__WAN_GATEWAY__', opnsense.gateway) |
-             regex_replace('__WAN_SUBNET__', opnsense.cidr | string) |
-             regex_replace('__NTP_TIMESERVERS__', ntp_servers | join(',')) |
-             regex_replace('__NTP_PREFER__', ntp_servers | join(',')) |
-             regex_replace('__OPNSENSE_HOSTNAME__', bundle.opnsense.hostname) |
-             regex_replace('__OPNSENSE_DOMAIN__', domain_name) |
-             regex_replace('__INTERFACE_WAN__', bundle.opnsense.interfaces.wan) |
-             regex_replace('__INTERFACE_LAN__', bundle.opnsense.interfaces.lan) |
-             regex_replace('__INTERFACE_OPT1__', bundle.opnsense.interfaces.opt1) }}
+      ansible.builtin.template:
+        src: "{{ template_file }}"
         dest: "{{ output_file }}"
         mode: "0644"
 
 
 # ==================================================================
-# Stage OPNsense Files
+# Stage OPNsense Files on Libvirt Host
 # ==================================================================
 
-- name: Stage OPNsense files on mgmt-kvm
+- name: Stage OPNsense files on libvirt host
   hosts: klm_host
   gather_facts: false
   become: true
 
   pre_tasks:
+
     # ============================================================
     # Load Bundle Configuration
     # ============================================================
@@ -101,35 +113,45 @@
 
   vars:
     generated_config: "{{ klm_home }}/state/generated/config.xml"
+    staged_config: "{{ bundle.libvirt.dirs.opnsense }}/config.xml"
+    installer_iso_source: >-
+      {{ playbook_dir }}/../images/{{ bundle.opnsense.iso_name }}
+    installer_iso_dest: >-
+      {{ bundle.libvirt.dirs.config_images }}/{{ bundle.opnsense.iso_name }}
 
   tasks:
+
     # ============================================================
-    # Stage Configuration
+    # Stage OPNsense Configuration
     # ============================================================
 
-    - name: Copy generated OPNsense configuration
+    - name: Ensure OPNsense configuration directory exists
+      ansible.builtin.file:
+        path: "{{ bundle.libvirt.dirs.opnsense }}"
+        state: directory
+        owner: "{{ bundle.libvirt.qemu_user }}"
+        group: "{{ bundle.libvirt.qemu_group }}"
+        mode: "0755"
+
+    - name: Stage generated OPNsense configuration
       ansible.builtin.copy:
         src: "{{ generated_config }}"
-        dest: "{{ bundle.libvirt.dirs.opnsense }}/config.xml"
+        dest: "{{ staged_config }}"
         owner: "{{ bundle.libvirt.qemu_user }}"
         group: "{{ bundle.libvirt.qemu_group }}"
         mode: "0644"
 
-
     # ============================================================
-    # Stage Installer
+    # Stage OPNsense Installer ISO
     # ============================================================
 
-    - name: Copy OPNsense installer ISO
+    - name: Stage OPNsense installer ISO
       ansible.builtin.copy:
-        src: >-
-          {{ playbook_dir }}/../images/{{ bundle.opnsense.iso_name }}
-        dest: >-
-          {{ bundle.libvirt.dirs.config_images }}/{{ bundle.opnsense.iso_name }}
+        src: "{{ installer_iso_source }}"
+        dest: "{{ installer_iso_dest }}"
         owner: "{{ bundle.libvirt.qemu_user }}"
         group: "{{ bundle.libvirt.qemu_group }}"
         mode: "0644"
-
 
     # ============================================================
     # SELinux
@@ -137,16 +159,12 @@
 
     - name: Restore SELinux context on OPNsense configuration
       ansible.builtin.command:
-        cmd: >-
-          restorecon -v
-          {{ bundle.libvirt.dirs.opnsense }}/config.xml
-      register: restore_opnsense_config
-      changed_when: restore_opnsense_config.stdout is search("Relabeled|reset")
+        cmd: "restorecon -v {{ staged_config }}"
+      register: config_restorecon
+      changed_when: config_restorecon.stdout is search('Relabeled|reset')
 
     - name: Restore SELinux context on OPNsense installer ISO
       ansible.builtin.command:
-        cmd: >-
-          restorecon -v
-          {{ bundle.libvirt.dirs.config_images }}/{{ bundle.opnsense.iso_name }}
-      register: restore_opnsense_iso
-      changed_when: restore_opnsense_iso.stdout is search("Relabeled|reset")
+        cmd: "restorecon -v {{ installer_iso_dest }}"
+      register: iso_restorecon
+      changed_when: iso_restorecon.stdout is search('Relabeled|reset')

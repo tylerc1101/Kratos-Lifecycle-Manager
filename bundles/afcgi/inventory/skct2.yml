@@ -1,64 +1,61 @@
+---
 all:
   vars:
-    openspace_user: kratos
     env_name: skct2
     domain_name: base-kit-2.kratos
 
     klm_home: /opt/openspace
+    openspace_user: kratos
 
     ntp_servers:
       - 192.168.2.100
 
-    wan_dns_servers:
-      - 10.243.25.50
-      - 10.243.25.53
+    # DNS reachable through br-wan.
+    # br-wan uses wan_dns.servers directly.
+    # OPNsense forwarding entries inherit the same servers unless an
+    # individual forwarding entry provides its own servers list.
+    wan_dns:
+      servers:
+        - 10.243.25.50
+        - 10.243.25.53
+      search_domains:
+        - rtlogic.com
+
+      forwarding:
+        - domain: rtlogic.com
+          description: Kratos Dev DNS
 
     opnsense:
-      wan_ip: 10.243.77.222
+      wan_ip: 10.243.76.221
       gateway: 10.243.76.1
       cidr: 23
 
     ssh_key: rancher_ssh_key
 
-    # ==========================================================
-    # Optional Bundle Overrides
-    #
-    # Use this only when this entire environment needs to differ
-    # from the defaults delivered in vars.yml.
-    # ==========================================================
     bundle_overrides: {}
-    # Example:
-    #
-    # bundle_overrides:
-    #   rhel_image_name: RHEL9_CUSTOM.qcow2
 
   children:
     klm_host:
       hosts:
         mgmt-kvm:
-          ansible_host: 10.243.77.212
-          host_overrides: {}
-    
+          ansible_host: 10.243.76.15
+
     vms:
       children:
         mcm:
           hosts:
             mcm1:
               ansible_host: 192.168.2.8
-              host_overrides: {}
-    
+
         osms:
           hosts:
             osms1:
               ansible_host: 192.168.2.9
-              host_overrides: {}
-    
+
     osdc:
       hosts:
         osdc1:
           ansible_host: 192.168.2.16
-          host_overrides: {}
-    
+
         osdc2:
           ansible_host: 192.168.2.17
-          host_overrides: {}

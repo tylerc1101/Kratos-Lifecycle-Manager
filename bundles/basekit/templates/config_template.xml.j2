@@ -1,14 +1,201 @@
 <?xml version="1.0"?>
 <opnsense>
   <theme>opnsense</theme>
-  
-  <!-- System Configuration -->
+  <sysctl>
+    <item>
+      <descr>Increase UFS read-ahead speeds to match the state of hard drives and NCQ.</descr>
+      <tunable>vfs.read_max</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Set the ephemeral port range to be lower.</descr>
+      <tunable>net.inet.ip.portrange.first</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Drop packets to closed TCP ports without returning a RST</descr>
+      <tunable>net.inet.tcp.blackhole</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Do not send ICMP port unreachable messages for closed UDP ports</descr>
+      <tunable>net.inet.udp.blackhole</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Randomize the ID field in IP packets</descr>
+      <tunable>net.inet.ip.random_id</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>
+        Source routing is another way for an attacker to try to reach non-routable addresses behind your box.
+        It can also be used to probe for information about your internal networks. These functions come enabled
+        as part of the standard FreeBSD core system.
+      </descr>
+      <tunable>net.inet.ip.sourceroute</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>
+        Source routing is another way for an attacker to try to reach non-routable addresses behind your box.
+        It can also be used to probe for information about your internal networks. These functions come enabled
+        as part of the standard FreeBSD core system.
+      </descr>
+      <tunable>net.inet.ip.accept_sourceroute</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>
+        This option turns off the logging of redirect packets because there is no limit and this could fill
+        up your logs consuming your whole hard drive.
+      </descr>
+      <tunable>net.inet.icmp.log_redirect</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Drop SYN-FIN packets (breaks RFC1379, but nobody uses it anyway)</descr>
+      <tunable>net.inet.tcp.drop_synfin</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Enable sending IPv6 redirects</descr>
+      <tunable>net.inet6.ip6.redirect</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Enable privacy settings for IPv6 (RFC 4941)</descr>
+      <tunable>net.inet6.ip6.use_tempaddr</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Prefer privacy addresses and use them over the normal addresses</descr>
+      <tunable>net.inet6.ip6.prefer_tempaddr</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Generate SYN cookies for outbound SYN-ACK packets</descr>
+      <tunable>net.inet.tcp.syncookies</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Maximum incoming/outgoing TCP datagram size (receive)</descr>
+      <tunable>net.inet.tcp.recvspace</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Maximum incoming/outgoing TCP datagram size (send)</descr>
+      <tunable>net.inet.tcp.sendspace</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Do not delay ACK to try and piggyback it onto a data packet</descr>
+      <tunable>net.inet.tcp.delayed_ack</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Maximum outgoing UDP datagram size</descr>
+      <tunable>net.inet.udp.maxdgram</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Handling of non-IP packets which are not passed to pfil (see if_bridge(4))</descr>
+      <tunable>net.link.bridge.pfil_onlyip</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Set to 1 to additionally filter on the physical interface for locally destined packets</descr>
+      <tunable>net.link.bridge.pfil_local_phys</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Set to 0 to disable filtering on the incoming and outgoing member interfaces.</descr>
+      <tunable>net.link.bridge.pfil_member</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Set to 1 to enable filtering on the bridge interface</descr>
+      <tunable>net.link.bridge.pfil_bridge</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Allow unprivileged access to tap(4) device nodes</descr>
+      <tunable>net.link.tap.user_open</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Randomize PID's (see src/sys/kern/kern_fork.c: sysctl_kern_randompid())</descr>
+      <tunable>kern.randompid</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Disable CTRL+ALT+Delete reboot from keyboard.</descr>
+      <tunable>hw.syscons.kbd_reboot</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Enable TCP extended debugging</descr>
+      <tunable>net.inet.tcp.log_debug</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Set ICMP Limits</descr>
+      <tunable>net.inet.icmp.icmplim</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>TCP Offload Engine</descr>
+      <tunable>net.inet.tcp.tso</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>UDP Checksums</descr>
+      <tunable>net.inet.udp.checksum</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Maximum socket buffer size</descr>
+      <tunable>kern.ipc.maxsockbuf</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Page Table Isolation (Meltdown mitigation, requires reboot.)</descr>
+      <tunable>vm.pmap.pti</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Disable Indirect Branch Restricted Speculation (Spectre V2 mitigation)</descr>
+      <tunable>hw.ibrs_disable</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Hide processes running as other groups</descr>
+      <tunable>security.bsd.see_other_gids</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Hide processes running as other users</descr>
+      <tunable>security.bsd.see_other_uids</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Enable/disable sending of ICMP redirects in response to IP packets for which a better,
+        and for the sender directly reachable, route and next hop is known.
+      </descr>
+      <tunable>net.inet.ip.redirect</tunable>
+      <value>default</value>
+    </item>
+    <item>
+      <descr>Maximum outgoing UDP datagram size</descr>
+      <tunable>net.local.dgram.maxdgram</tunable>
+      <value>default</value>
+    </item>
+  </sysctl>
   <system>
     <optimization>normal</optimization>
-    <hostname>{{ opnsense.hostname }}</hostname>
+    <hostname>{{ bundle.opnsense.hostname }}</hostname>
     <domain>{{ domain_name }}</domain>
     <dnsallowoverride>1</dnsallowoverride>
-    
     <group>
       <name>admins</name>
       <description>System Administrators</description>
@@ -17,7 +204,6 @@
       <member>0</member>
       <priv>page-all</priv>
     </group>
-    
     <user>
       <name>root</name>
       <descr>System Administrator</descr>
@@ -29,21 +215,18 @@
       <authorizedkeys/>
       <otp_seed/>
     </user>
-    
     <nextuid>2000</nextuid>
     <nextgid>2000</nextgid>
-    <timezone>{{ opnsense.timezone }}</timezone>
-    <timeservers>{{ ntp.server }}</timeservers>
-    
+    <timezone>Etc/UTC</timezone>
+    <timeservers>{{ ntp_servers | join(',') }}</timeservers>
     <webgui>
       <protocol>https</protocol>
       <ssl-certref>67293f300ae55</ssl-certref>
-      <port>{{ opnsense.webgui_port }}</port>
+      <port>8443</port>
       <ssl-ciphers/>
       <interfaces/>
       <compression/>
     </webgui>
-    
     <disablenatreflection>yes</disablenatreflection>
     <usevirtualterminal>1</usevirtualterminal>
     <disableconsolemenu>1</disableconsolemenu>
@@ -94,24 +277,21 @@
     <dns7gw>none</dns7gw>
     <dns8gw>none</dns8gw>
   </system>
-
-  <!-- Network Interfaces -->
   <interfaces>
     <wan>
-      <if>{{ opnsense.wan_interface }}</if>
+      <if>{{ bundle.opnsense.interfaces.wan }}</if>
       <descr/>
       <enable>1</enable>
       <spoofmac/>
       <ipaddr>{{ opnsense.wan_ip }}</ipaddr>
-      <subnet>{{ customer_network.cidr | regex_replace('^/', '') }}</subnet>
+      <subnet>{{ opnsense.cidr }}</subnet>
       <gateway>WAN_GW</gateway>
     </wan>
-    
     <lan>
       <enable>1</enable>
-      <if>{{ opnsense.lan_interface }}</if>
-      <ipaddr>{{ mgmt_network.gateway }}</ipaddr>
-      <subnet>{{ mgmt_network.cidr | regex_replace('^/', '') }}</subnet>
+      <if>{{ bundle.opnsense.interfaces.lan }}</if>
+      <ipaddr>192.168.2.1</ipaddr>
+      <subnet>24</subnet>
       <ipaddrv6/>
       <subnetv6/>
       <media/>
@@ -119,7 +299,6 @@
       <gateway/>
       <gatewayv6/>
     </lan>
-    
     <lo0>
       <internal_dynamic>1</internal_dynamic>
       <descr>Loopback</descr>
@@ -132,100 +311,266 @@
       <type>none</type>
       <virtual>1</virtual>
     </lo0>
-    
     <opt1>
-      <if>{{ opnsense.opt1_interface }}</if>
+      <if>{{ bundle.opnsense.interfaces.opt1 }}</if>
       <enable>1</enable>
-      <ipaddr>{{ bmc_network.gateway }}</ipaddr>
-      <subnet>{{ bmc_network.cidr | regex_replace('^/', '') }}</subnet>
+      <ipaddr>192.168.0.1</ipaddr>
+      <subnet>24</subnet>
       <gateway/>
       <ipaddrv6/>
       <subnetv6/>
       <gatewayv6/>
     </opt1>
   </interfaces>
-
-  <!-- DHCP Configuration -->
   <dhcpd>
     <lan>
       <enable>1</enable>
-      <gateway>{{ mgmt_network.gateway }}</gateway>
+      <gateway>192.168.2.1</gateway>
       <ddnsdomainalgorithm>hmac-md5</ddnsdomainalgorithm>
       <numberoptions>
         <item/>
       </numberoptions>
       <range>
-        <from>{{ mgmt_network.network }}.16</from>
-        <to>{{ mgmt_network.network }}.21</to>
+        <from>192.168.2.16</from>
+        <to>192.168.2.21</to>
       </range>
       <winsserver/>
-      <dnsserver>{{ mgmt_network.gateway }}</dnsserver>
+      <dnsserver>192.168.2.1</dnsserver>
       <ntpserver/>
-{% for mapping in opnsense.dhcp_static_maps %}
       <staticmap>
-        <mac>{{ mapping.mac }}</mac>
-        <ipaddr>{{ mapping.ip }}</ipaddr>
-        <hostname>{{ mapping.hostname }}</hostname>
-        <descr>{{ mapping.description }}</descr>
-        <gateway>{{ mapping.gateway }}</gateway>
+        <mac>{{ osdc1_mac | default('__OSDC1_MAC__') }}</mac>
+        <ipaddr>192.168.2.16</ipaddr>
+	<hostname>osdc-1</hostname>
+        <descr>OSDC 1</descr>
+        <gateway>192.168.2.1</gateway>
         <winsserver/>
-        <dnsserver>{{ mapping.dns }}</dnsserver>
+        <dnsserver>192.168.2.1</dnsserver>
         <ntpserver/>
       </staticmap>
-{% endfor %}
     </lan>
   </dhcpd>
-
-  <!-- SNMP Configuration -->
   <snmpd>
     <syslocation/>
     <syscontact/>
     <rocommunity>public</rocommunity>
   </snmpd>
-
-  <!-- NAT Rules -->
   <nat>
     <outbound>
       <mode>automatic</mode>
     </outbound>
-{% for forward in opnsense.port_forwards %}
     <rule>
-      <protocol>{{ forward.protocol }}</protocol>
+      <protocol>tcp</protocol>
       <interface>wan</interface>
       <category/>
       <ipprotocol>inet</ipprotocol>
-      <descr>{{ forward.descr }}</descr>
+      <descr>MCM Port Forward</descr>
       <tag/>
       <tagged/>
       <poolopts/>
-      <associated-rule-id>nat_{{ ansible_date_time.epoch }}_{{ loop.index }}</associated-rule-id>
-      <target>{{ forward.target }}</target>
-      <local-port>{{ forward.local_port }}</local-port>
+      <associated-rule-id>nat_672944b2cc29e6.85611362</associated-rule-id>
+      <target>192.168.2.254</target>
+      <local-port>443</local-port>
       <source>
         <any>1</any>
       </source>
       <destination>
         <network>(self)</network>
-        <port>{{ forward.wan_port }}</port>
+        <port>5443</port>
       </destination>
       <updated>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730757810.8363</time>
+        <description>/firewall_nat_edit.php made changes</description>
       </updated>
       <created>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730757810.8363</time>
+        <description>/firewall_nat_edit.php made changes</description>
       </created>
     </rule>
-{% endfor %}
+    <rule>
+      <protocol>tcp</protocol>
+      <interface>wan</interface>
+      <category/>
+      <ipprotocol>inet</ipprotocol>
+      <descr>OSMS Port Forward</descr>
+      <tag/>
+      <tagged/>
+      <poolopts/>
+      <associated-rule-id>nat_672944db3e6728.19185326</associated-rule-id>
+      <target>192.168.2.250</target>
+      <local-port>443</local-port>
+      <source>
+        <any>1</any>
+      </source>
+      <destination>
+        <network>(self)</network>
+        <port>443</port>
+      </destination>
+      <updated>
+        <username>root@10.241.3.42</username>
+        <time>1730757851.2556</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730757851.2556</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule>
+      <protocol>tcp</protocol>
+      <interface>wan</interface>
+      <category/>
+      <ipprotocol>inet</ipprotocol>
+      <descr>OSDC1 BMC Port Forward</descr>
+      <tag/>
+      <tagged/>
+      <poolopts/>
+      <associated-rule-id>nat_67294513315955.36241381</associated-rule-id>
+      <target>192.168.0.6</target>
+      <local-port>443</local-port>
+      <source>
+        <any>1</any>
+      </source>
+      <destination>
+        <network>(self)</network>
+        <port>5444</port>
+      </destination>
+      <updated>
+        <username>root@10.241.3.42</username>
+        <time>1730757907.2022</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730757907.2022</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule>
+      <protocol>tcp</protocol>
+      <interface>wan</interface>
+      <category/>
+      <ipprotocol>inet</ipprotocol>
+      <descr>OSDC2 BMC Port Forward</descr>
+      <tag/>
+      <tagged/>
+      <poolopts/>
+      <associated-rule-id>nat_672945559404b7.12516767</associated-rule-id>
+      <target>192.168.0.7</target>
+      <local-port>443</local-port>
+      <source>
+        <any>1</any>
+      </source>
+      <destination>
+        <network>(self)</network>
+        <port>5445</port>
+      </destination>
+      <updated>
+        <username>root@10.241.3.42</username>
+        <time>1730757973.6063</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730757973.6063</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule>
+      <protocol>tcp</protocol>
+      <interface>wan</interface>
+      <category/>
+      <ipprotocol>inet</ipprotocol>
+      <descr>3rd Party Server BMC Port Forward</descr>
+      <tag/>
+      <tagged/>
+      <poolopts/>
+      <associated-rule-id>nat_672945972391b1.02343666</associated-rule-id>
+      <target>192.168.0.8</target>
+      <local-port>443</local-port>
+      <source>
+        <any>1</any>
+      </source>
+      <destination>
+        <network>(self)</network>
+        <port>5446</port>
+      </destination>
+      <updated>
+        <username>root@10.241.3.42</username>
+        <time>1730758039.1457</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730758039.1457</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule>
+      <protocol>tcp</protocol>
+      <interface>wan</interface>
+      <category/>
+      <ipprotocol>inet</ipprotocol>
+      <descr>SpectralNet Wideband Card 1 Management Port Forward</descr>
+      <tag/>
+      <tagged/>
+      <poolopts/>
+      <associated-rule-id>nat_672945ca40c511.56702841</associated-rule-id>
+      <target>192.168.0.9</target>
+      <local-port>80</local-port>
+      <source>
+        <any>1</any>
+      </source>
+      <destination>
+        <network>(self)</network>
+        <port>5447</port>
+      </destination>
+      <updated>
+        <username>root@10.241.3.42</username>
+        <time>1730758090.2653</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730758090.2653</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule>
+      <protocol>tcp</protocol>
+      <interface>wan</interface>
+      <category/>
+      <ipprotocol>inet</ipprotocol>
+      <descr>SpectralNet Wideband Card 2 Management Port Forward</descr>
+      <tag/>
+      <tagged/>
+      <poolopts/>
+      <associated-rule-id>nat_672945fac5f1b6.33401425</associated-rule-id>
+      <target>192.168.0.10</target>
+      <local-port>80</local-port>
+      <source>
+        <any>1</any>
+      </source>
+      <destination>
+        <network>(self)</network>
+        <port>5448</port>
+      </destination>
+      <updated>
+        <username>root@10.241.3.42</username>
+        <time>1730758138.8108</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </updated>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730758138.8108</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
   </nat>
-
-  <!-- Firewall Filter Rules -->
   <filter>
-    <!-- WAN WebGUI Access -->
-    <rule uuid="{{ 999999999999 | random | to_uuid }}">
+    <rule uuid="55b12b5c-868b-4388-acf3-d2810d03eb98">
       <type>pass</type>
       <interface>wan</interface>
       <ipprotocol>inet</ipprotocol>
@@ -238,47 +583,167 @@
       </source>
       <destination>
         <network>(self)</network>
-        <port>{{ opnsense.webgui_port }}</port>
+        <port>8443</port>
       </destination>
       <updated>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730757597.8881</time>
+        <description>/firewall_rules_edit.php made changes</description>
       </updated>
       <created>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730757597.8881</time>
+        <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
-
-{% for forward in opnsense.port_forwards %}
-    <!-- Port Forward Rule: {{ forward.descr }} -->
-    <rule uuid="{{ 999999999999 | random | to_uuid }}">
-      <associated-rule-id>nat_{{ ansible_date_time.epoch }}_{{ loop.index }}</associated-rule-id>
+    <rule uuid="f9b32637-d6a7-4ca2-aff3-6df44add711e">
+      <associated-rule-id>nat_672944b2cc29e6.85611362</associated-rule-id>
       <source>
         <any>1</any>
       </source>
       <interface>wan</interface>
       <statetype>keep state</statetype>
-      <protocol>{{ forward.protocol }}</protocol>
+      <protocol>tcp</protocol>
       <ipprotocol>inet</ipprotocol>
       <destination>
-        <address>{{ forward.target }}</address>
-        <port>{{ forward.local_port }}</port>
+        <address>192.168.2.254</address>
+        <port>443</port>
       </destination>
-      <descr>{{ forward.descr }}</descr>
+      <descr>MCM Port Forward</descr>
       <category/>
       <created>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730757810.8363</time>
+        <description>/firewall_nat_edit.php made changes</description>
       </created>
     </rule>
-{% endfor %}
-
-    <!-- Default LAN Rules -->
-    <rule uuid="{{ 999999999999 | random | to_uuid }}">
+    <rule uuid="c1f2d5ff-2fe6-40f3-bb9a-e65f197fa2e8">
+      <associated-rule-id>nat_672944db3e6728.19185326</associated-rule-id>
+      <source>
+        <any>1</any>
+      </source>
+      <interface>wan</interface>
+      <statetype>keep state</statetype>
+      <protocol>tcp</protocol>
+      <ipprotocol>inet</ipprotocol>
+      <destination>
+        <address>192.168.2.250</address>
+        <port>443</port>
+      </destination>
+      <descr>OSMS Port Forward</descr>
+      <category/>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730757851.2556</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="5539de04-27f9-48ce-a3c4-59eb5db75a86">
+      <associated-rule-id>nat_67294513315955.36241381</associated-rule-id>
+      <source>
+        <any>1</any>
+      </source>
+      <interface>wan</interface>
+      <statetype>keep state</statetype>
+      <protocol>tcp</protocol>
+      <ipprotocol>inet</ipprotocol>
+      <destination>
+        <address>192.168.0.6</address>
+        <port>443</port>
+      </destination>
+      <descr>OSDC1 BMC Port Forward</descr>
+      <category/>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730757907.2021</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="41e445f9-f8c7-4e14-85cb-770be48314af">
+      <associated-rule-id>nat_672945559404b7.12516767</associated-rule-id>
+      <source>
+        <any>1</any>
+      </source>
+      <interface>wan</interface>
+      <statetype>keep state</statetype>
+      <protocol>tcp</protocol>
+      <ipprotocol>inet</ipprotocol>
+      <destination>
+        <address>192.168.0.7</address>
+        <port>443</port>
+      </destination>
+      <descr>OSDC2 BMC Port Forward</descr>
+      <category/>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730757973.6063</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="e14ba78c-56b9-4e9c-b201-e4e9e41acb76">
+      <associated-rule-id>nat_672945972391b1.02343666</associated-rule-id>
+      <source>
+        <any>1</any>
+      </source>
+      <interface>wan</interface>
+      <statetype>keep state</statetype>
+      <protocol>tcp</protocol>
+      <ipprotocol>inet</ipprotocol>
+      <destination>
+        <address>192.168.0.8</address>
+        <port>443</port>
+      </destination>
+      <descr>3rd Party Server BMC Port Forward</descr>
+      <category/>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730758039.1457</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="e625650b-dc58-4560-a042-8f1592e4f154">
+      <associated-rule-id>nat_672945ca40c511.56702841</associated-rule-id>
+      <source>
+        <any>1</any>
+      </source>
+      <interface>wan</interface>
+      <statetype>keep state</statetype>
+      <protocol>tcp</protocol>
+      <ipprotocol>inet</ipprotocol>
+      <destination>
+        <address>192.168.0.9</address>
+        <port>80</port>
+      </destination>
+      <descr>SpectralNet Wideband Card 1 Management Port Forward</descr>
+      <category/>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730758090.2653</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="05ef18b0-a111-49ff-aff7-45fccf5afd3f">
+      <associated-rule-id>nat_672945fac5f1b6.33401425</associated-rule-id>
+      <source>
+        <any>1</any>
+      </source>
+      <interface>wan</interface>
+      <statetype>keep state</statetype>
+      <protocol>tcp</protocol>
+      <ipprotocol>inet</ipprotocol>
+      <destination>
+        <address>192.168.0.10</address>
+        <port>80</port>
+      </destination>
+      <descr>SpectralNet Wideband Card 2 Management Port Forward</descr>
+      <category/>
+      <created>
+        <username>root@10.241.3.42</username>
+        <time>1730758138.8108</time>
+        <description>/firewall_nat_edit.php made changes</description>
+      </created>
+    </rule>
+    <rule uuid="91d2848a-5d91-4880-9f6c-d2c1b97d64a4">
       <type>pass</type>
       <ipprotocol>inet</ipprotocol>
       <descr>Default allow LAN to any rule</descr>
@@ -290,8 +755,7 @@
         <any/>
       </destination>
     </rule>
-    
-    <rule uuid="{{ 999999999999 | random | to_uuid }}">
+    <rule uuid="29d85cc7-8368-4db3-8a04-60d01ec2b05a">
       <type>pass</type>
       <ipprotocol>inet6</ipprotocol>
       <descr>Default allow LAN IPv6 to any rule</descr>
@@ -303,9 +767,7 @@
         <any/>
       </destination>
     </rule>
-    
-    <!-- OPT1 NTP Rule -->
-    <rule uuid="{{ 999999999999 | random | to_uuid }}">
+    <rule uuid="f6ed4747-e6de-4871-a086-f1409148296b">
       <type>pass</type>
       <interface>opt1</interface>
       <ipprotocol>inet</ipprotocol>
@@ -322,43 +784,33 @@
         <port>123</port>
       </destination>
       <updated>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730760959.1162</time>
+        <description>/firewall_rules_edit.php made changes</description>
       </updated>
       <created>
-        <username>ansible@automated</username>
-        <time>{{ ansible_date_time.epoch }}</time>
-        <description>Generated by Ansible</description>
+        <username>root@10.241.3.42</username>
+        <time>1730760926.7279</time>
+        <description>/firewall_rules_edit.php made changes</description>
       </created>
     </rule>
   </filter>
-
-  <!-- RRD -->
   <rrd>
     <enable/>
   </rrd>
-
-  <!-- NTP Configuration -->
   <ntpd>
-    <prefer>{{ ntp.server }}</prefer>
-    <iburst>{{ ntp.server }}</iburst>
+    <prefer>{{ ntp_servers | join(',') }}</prefer>
+    <iburst>{{ ntp_servers | join(',') }}</iburst>
   </ntpd>
-
-  <!-- Widgets -->
   <widgets>
     <sequence>system_information-container:00000000-col3:show,services_status-container:00000001-col4:show,gateways-container:00000002-col4:show,interface_list-container:00000003-col4:show</sequence>
     <column_count>2</column_count>
   </widgets>
-
-  <!-- Revision -->
   <revision>
-    <username>ansible@automated</username>
-    <time>{{ ansible_date_time.epoch }}</time>
-    <description>Generated by Ansible automation</description>
+    <username>root@10.241.2.177</username>
+    <time>1733177785.2078</time>
+    <description>user "root" changed</description>
   </revision>
-
-  <!-- OPNsense Configuration -->
   <OPNsense>
     <DHCRelay version="1.0.1"/>
     <wireguard>
@@ -677,18 +1129,16 @@
         <path/>
       </test>
     </monit>
-    
-    <!-- Gateways -->
     <Gateways version="1.0.0">
-      <gateway_item uuid="{{ 999999999999 | random | to_uuid }}">
+      <gateway_item uuid="96ae570b-2409-43e2-b4b4-ac42a4532bc6">
         <disabled>0</disabled>
         <name>WAN_GW</name>
         <descr>Interface WAN Gateway</descr>
         <interface>wan</interface>
         <ipprotocol>inet</ipprotocol>
-        <gateway>{{ customer_network.gateway }}</gateway>
+        <gateway>{{ opnsense.gateway }}</gateway>
         <defaultgw>1</defaultgw>
-        <fargw>1</fargw>
+        <fargw>0</fargw>
         <monitor_disable>1</monitor_disable>
         <monitor_noroute/>
         <monitor/>
@@ -705,8 +1155,6 @@
         <data_length/>
       </gateway_item>
     </Gateways>
-    
-    <!-- Syslog -->
     <Syslog version="1.0.2">
       <general>
         <enabled>1</enabled>
@@ -716,15 +1164,11 @@
       </general>
       <destinations/>
     </Syslog>
-    
-    <!-- Traffic Shaper -->
     <TrafficShaper version="1.0.3">
       <pipes/>
       <queues/>
       <rules/>
     </TrafficShaper>
-    
-    <!-- Unbound DNS -->
     <unboundplus version="1.0.9">
       <general>
         <enabled>1</enabled>
@@ -802,41 +1246,150 @@
       <forwarding>
         <enabled/>
       </forwarding>
-      <dots/>
-      <hosts>
-{% for host in opnsense.dns_hosts %}
-        <host uuid="{{ 999999999999 | random | to_uuid }}">
+      <dots>
+{% for forward in wan_dns.forwarding | default([]) %}
+{% set forward_servers = forward.servers | default(wan_dns.servers, true) %}
+{% for server in forward_servers %}
+        <dot uuid="{{ (forward.domain ~ '-' ~ server) | to_uuid }}">
           <enabled>1</enabled>
-          <hostname>{{ host.hostname }}</hostname>
+          <type>forward</type>
+          <domain>{{ forward.domain }}</domain>
+          <server>{{ server }}</server>
+          <port>53</port>
+          <verify/>
+          <forward_tcp_upstream>0</forward_tcp_upstream>
+          <forward_first>0</forward_first>
+          <description>{{ forward.description | default('') }}</description>
+        </dot>
+{% endfor %}
+{% endfor %}
+      </dots>
+      <hosts>
+        <host uuid="85bbd389-ebab-4091-804c-a6a326f88634">
+          <enabled>1</enabled>
+          <hostname>mgmt-kvm</hostname>
           <domain>{{ domain_name }}</domain>
           <rr>A</rr>
           <mxprio/>
           <mx/>
-          <server>{{ host.ip }}</server>
-          <description>{{ host.description }}</description>
+          <server>192.168.2.6</server>
+          <description>Management Server (Hypervisor)</description>
         </host>
-{% endfor %}
-{% if opnsense.dns_wildcards is defined %}
-{% for wildcard in opnsense.dns_wildcards %}
-        <host uuid="{{ 999999999999 | random | to_uuid }}">
+        <host uuid="9ff5bbc3-7cc3-4d51-94ee-0452409ac14f">
           <enabled>1</enabled>
-          <hostname>{{ wildcard.hostname }}</hostname>
-          <domain>{{ wildcard.domain }}</domain>
+          <hostname>onboarder</hostname>
+          <domain>{{ domain_name }}</domain>
           <rr>A</rr>
           <mxprio/>
           <mx/>
-          <server>{{ wildcard.ip }}</server>
-          <description>{{ wildcard.description }}</description>
+          <server>192.168.2.7</server>
+          <description>Management - Onboarder VM</description>
         </host>
-{% endfor %}
-{% endif %}
+        <host uuid="df00fc10-3c41-4b53-9f25-9a55cb509ce6">
+          <enabled>1</enabled>
+          <hostname>mcm-1</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.8</server>
+          <description>Management - MCM VM</description>
+        </host>
+        <host uuid="c68230d6-613e-438c-8e46-2cc9ab18b953">
+          <enabled>1</enabled>
+          <hostname>osms-1</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.9</server>
+          <description>Management - OSMS VM</description>
+        </host>
+        <host uuid="c3fd87b5-3e0c-4d61-aed7-d6e3e49a37a1">
+          <enabled>1</enabled>
+          <hostname>osdc-1</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.16</server>
+          <description>OSDC-1</description>
+        </host>
+        <host uuid="5c4c8a9c-a8e3-40ea-ac8c-292fe843fed5">
+          <enabled>1</enabled>
+          <hostname>osdc-2</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.17</server>
+          <description>OSDC-2</description>
+        </host>
+        <host uuid="c9229e0a-94ab-4c73-994f-01903edc7dee">
+          <enabled>1</enabled>
+          <hostname>osdc</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.249</server>
+          <description>OSDC VIP</description>
+        </host>
+        <host uuid="7bc3459e-2422-44e0-9a5a-a1225d04ec33">
+          <enabled>1</enabled>
+          <hostname>osms</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.250</server>
+          <description>OSMS VIP</description>
+        </host>
+        <host uuid="e0c21284-7016-4f93-ac9f-97d07dd9ed6f">
+          <enabled>1</enabled>
+          <hostname>api-osdc</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.251</server>
+          <description>OSDC API VIP</description>
+        </host>
+        <host uuid="3cd370f7-7733-410f-b329-4a6b1c09f36f">
+          <enabled>1</enabled>
+          <hostname>api-osms</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.252</server>
+          <description>OSMS API VIP</description>
+        </host>
+        <host uuid="96e852cd-8490-43c9-a61b-b597e234fa7b">
+          <enabled>1</enabled>
+          <hostname>api-mcm</hostname>
+          <domain>{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.253</server>
+          <description>MCM API VIP</description>
+        </host>
+        <host uuid="24f33543-29e8-439b-83d5-806d5124b3e4">
+          <enabled>1</enabled>
+          <hostname>*</hostname>
+          <domain>mcm.{{ domain_name }}</domain>
+          <rr>A</rr>
+          <mxprio/>
+          <mx/>
+          <server>192.168.2.254</server>
+          <description>MCM Wildcard VIP</description>
+        </host>
       </hosts>
       <aliases/>
       <domains/>
     </unboundplus>
   </OPNsense>
-  
-  <!-- HA Sync -->
   <hasync version="1.0.0">
     <disablepreempt>0</disablepreempt>
     <disconnectppps>0</disconnectppps>
@@ -849,65 +1402,37 @@
     <password/>
     <syncitems/>
   </hasync>
-  
-  <!-- OpenVPN -->
   <openvpn/>
-  
-  <!-- Interface Groups -->
   <ifgroups version="1.0.0"/>
-  
-  <!-- GIF Tunnels -->
   <gifs version="1.0.0">
     <gif/>
   </gifs>
-  
-  <!-- GRE Tunnels -->
   <gres version="1.0.0">
     <gre/>
   </gres>
-  
-  <!-- Link Aggregation -->
   <laggs version="1.0.0">
     <lagg/>
   </laggs>
-  
-  <!-- Virtual IPs -->
   <virtualip version="1.0.0">
     <vip/>
   </virtualip>
-  
-  <!-- VLANs -->
   <vlans version="1.0.0">
     <vlan/>
   </vlans>
-  
-  <!-- Static Routes -->
   <staticroutes version="1.0.0">
     <route/>
   </staticroutes>
-  
-  <!-- Bridges -->
   <bridges>
     <bridged/>
   </bridges>
-  
-  <!-- PPP -->
   <ppps>
     <ppp/>
   </ppps>
-  
-  <!-- Wireless -->
   <wireless>
     <clone/>
   </wireless>
-  
-  <!-- Certificate Authorities -->
   <ca/>
-  
-  <!-- DHCPv6 -->
   <dhcpdv6/>
-  
-  <!-- Certificate (Keep existing from original config) -->
   <cert uuid="cb12cf71-da78-40d1-a2e0-a722713342c7">
     <refid>67293f300ae55</refid>
     <descr>Web GUI TLS certificate</descr>
@@ -916,7 +1441,6 @@
     <csr/>
     <prv>LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUpSQUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQ1M0d2dna3FBZ0VBQW9JQ0FRRGFEelZxZWNwUzJhU1oKdzQ4OU1OS1dGRzYwKzRyQyt2MEliaTJhSlJvZDRFSjRud1pnd3M1VU1QUGhscVQvbmJYcldMMXR2UnkwWHIrWgpYN3AxVjRzZnFaMldaQmsxY3BtNnNJS3VIU1BRSkJFc2ZRQ2xxUzF5K0h0TldnRzZ1bWpGNmdnMlRXZ0tBb3RjCmlCcUErTC9wZmZOWlNwSlBRZVlYcTR1UCtnTDMrK1hwNDJaU0tOaVMvbGhwNFlKVktpUEhPdGdNNm9MSWI3S00KUVNpaHVPeCtwcUhpek80QTN1K1JROWxzTVZzMWNhU0U3S2dlTjI5SUc3cVlyTEhVWW84SXFJVG1SOFcwSHlGawpuT0xnTHVtOXRpeE4xK2F6ZkxreDltNzRnZnBxNXVUQjhOaHdtZ3d4bnNCV1UxRm83NlI0REZpSFNaM0FjbWRVCjFpMkQ5T1NNMHlTQ2lFZnNpb3RQVUx2MC9kbk5ZSC95dW1FQzRsU1EyR3J3S1pDWVVSaHAra1NoeGVUdGtZdjIKcjNBNC96WmhvN1JOZVp2aW8vZFBLdGdnc2g0dVNwMUNRSE53Q3VuejFGSXd3VDd3QUFtbDFvY0xhVTNsd2VQQwoxVnZ5dzVDUDIwc0tBNGttandmTjZmUy9LNDgxUW92UVExcW9nQ3NYdjJvWUQ4bEU5M3NhcDZjMXh2dkxjS1dXClJWT1VCR202NWY5TWdWOWVtVWU4d3dBc1NUTlRkenFnNmpPRWd0ZHNWTFhqb2dwTG4vUjNhKzc5MlY3VGxlKzUKRFkxb243TlhhRHFjcXlEMEdYd2Z4aGhuK3NsK24xeVgxZ3ZvQ3FGQkdRVHM3cDdpWkhMc2NrYVJSWW96U2JUYgpFQWtMM3NldWh3V1l6RXJSMnF3NDNzVkxDanBzMlFJREFRQUJBb0lDQUFDbmNvNEdzYXI2TkI5MXUrV3lHMUlWCnFEeFYrUUYvc1F3NWwwMU1ITTIvYmFzaXNBKzBlTzJ6SE44Z1JtdWVjeVRGM2M1d0VXMm8wZGE5d09vZjdHMEIKaGZCR1dtdjhJRTJTOW5YSnNaUTJhTmYvbFpLRWhUTlRWT1Zrc3JCUjdUeE10R3ZGZW5XekJ1ZVBZdTluOUJkZwp0RjJ3d2JnQmc0aVB3TWprc1B6MVZNL1JGQkloUUJZUEp0TkFoWlZ0VGhqNnVtSG94cUpOdTZ1Q3VSQytYT0xpClJTOVFTRmdRQ09SY2phK0Z5QjVkQ1ZsVEVLcW5pWGJrY1hzZStDeEpxaUx4U1l1SEVkRXAvRE9OZkRqTGdEQ3AKVVA4RDRXd3NFOWJWODk0MmczcUhsUnNjNGhtUUt3MDBvZGlka0dVdnV6S0toMkVjOHdoVnR1QjhJQUVqQXVueQo4cFhWVjZSRHJtZnhwUUc2S01pMGVnb2ZYbFpYbTZvaENnNlVlc09Dc1Z3RWhRcnpMa2kyNCtGbGx3cmExbGw1CkIzek9aU1RLZEw2cEs1bURNekFQekNLM1JSSE1qQ0x3cXc4ZEwvYXlpbWxRY0YwYmlWcE9laEkyRStCa0RpZUgKSjNUTlYySjJpMTNTVU5PY1FITFlVQWhERjJnRTBkS3VnZjhFc2RmblJ6cXY5b3owbXY3U0RtMlpTWHhMMG1OSQp6dTVybE1NbXRXZ0djN3dCUXRBRGNkMXdDTnJXWUk5MVYxZklWazZ2MjZsNDhNVjcvbkRXWXNpSDBVamptVXdTCmNpbFljbmROaTROak9rVS9CSXk5U0VpVm1xenQ1N3NZMUN6RVZ6Nm5EZi96OEsvNk5VU08rc0tzZTdLb2cyYzgKV2EwRjZVZDc3Nm9hN05kbHM4b3hBb0lCQVFENHNzQ1IrVVhUVzd4TEtLWmhMem5odGp3UjNqV0xkTjJvWXVoSQpxYWJTYnArL01XNGtXeWs4TFViTml2eXNYVVRjT0xkc29sTVMzVFlsM1ZRaGZ4bHpOc2x4NTF1S1poY3BhNFV3CnpMRU9Kb0laNmhQdVFTZEVLODBzSm9CZG5nT1Npb2VvNVU4blFMZjJjRnY0T1dhWEkwQUs0WEJiVEg4L2RyTm0KR0dubE9MY1F0SEp5bVlESjlTSGRoY0l2aStxY1dXOU0zMFFFNjJGNm9iUFhEM29IOHE2clhsOFFUZmhBQS9nNApyVk1ITUJDc0lEOWxQSlhYRXNMRDhXdEljNWRwcERhZkdhRzhxNUtwWlRMbzV2VnoxaHNuRStTVWtrZUdZc1JHCkdGYmJ5Y2NjT3kzNmo1bVVROUFXM1NBZXJyYmtxVC9DU1IxdUJ4aXZqaEoyK1ZZcEFvSUJBUURnZGl2Rm1ObXgKdkVZcmFUZHY4OWRCazdSS2JMY2FiYUM2M0lSN0lsTkFhcHJabTg2RHB6ZDZheXhDSWJTRk5vSTM3OXNLS3lsbwpJRlZCRnhza2NCZzJ5VGovS21UNG5QV1VhMGZNVTNzWWxBZG4veUNYaVNmYkFkdURmN3AyS3A0M3gwUWtrMDl3CnN0V3lMN2I0RHdxa2RVWUlydjBBY3p6YW5YOExob3h0WGVRM0JaR3pOaXVyTFY4WnhtRXl0UFJSck52a3BvZWcKcG9vNjlvbFVMM1dpZzFUaVFvME9vZHoxK3VsWTlJQWJXYW01K1o3SWFHUVB5OHY0WlNNc003a0NyYXJ1TmtFVwpUQTd6VGU4Y0NOMUVBT29acXVqNnNvOFRqeEVxUTkzQVVMQXBNNXhQaGdKYWRsVUlnbitHekJQOFd5dmY4cXVFClBLSHU0OFZEa1ZjeEFvSUJBUURtZHQrMVprYXF3c3dPNmpDa3h0cmdxN3VtNDBERFp4MHh1ZFovMzVkVVVtZC8KQ2hPRFpXY2srT0F3QWFoOUlrRjV3cVZYNm1VSmlpMXZrVmN4WTFMMlRjTUg1dG9SdXVHajVKdWN5Vk1hUmQweQpucFN4cVhiMTJaRmNaS0Y0SDhJM3ZtQlF4NDgrVk44bFpLSVZ1VHUwdTFuUnUzQWZheGhRZTNOc0hSdWs2NVhaCnlSNTF6SUpvcE4wcEo1YjM4TFVOQm1QNTNMeHZ3cUNtdjhxa2RSY2szbU8zTXREdGp4T0tYeU5iZ21MNnVqUDUKRGpreFc1K1BtemNaMVZNUjVPeGZYV213cmxRUFB2KytNcVdtNXNCM0ErWk5wRVdpMkp1bmtVZEpuYXlBS05CMgovUEJ5elRnSkNYNkFjWkllWE5IbnZGLzFiMFB5Zm1rRjVxWjkwamxoQW9JQkFRQ1EwKzZlU21kOFJNekp5ZFBaClNtNURnN2c2cFRibnVJQ1MwU0l5Q1EzS2JINkpsZnlEK2VyVDlEN1VWTWNUaFA0MGRYRFJlTlA0dVpRSXNZM3oKenRmdzBaa1RHeG1YU0Q4MGlwd0MvSUphYzNqcjR6UDJVcXNDcG9vcXFNbDQ0VHJCSnJPVEhmR045L1htU044Mwo0d3lzM0haWnQvN0t3WkFzUnA3b291SU0xeDRmV2xxT1ZZK0xuWFRWUHFrTWZMRi8yWmJ3UzNzTGJ5bVZyZWtpCkJwVlNUSWNDam9wUlBLTkRtNmZnbTdIazg4K05qY0NqOHFkTmdlT1QzRDM3a1V2NHJIR3p6aEhrL3lKT1hxUy8KWkFEUWxmNTJuVTVDSStBcGNKQlV3d0ZieXpRL0FXd0Q2Nld0Rk5qODZxYTZKUWRvTnJOeWhqT2cyVFpxMjFBMgpycHFoQW9JQkFRQ3c4R21NV1luZjBnWDJ0WTJMajBQdEJVWEJ1UGg3Sk11bEN3UEtCT0tKZHplRnQzUWl6KzNMCm80V1R2LzB0L25ORDllQ2pIYm53cnp0UEpMUWtsYTlPNitVMUp5djJNTDNNTXRnT1lveUNGRGJLa0lleTdvSjQKY1VZWlVBa3l6OVd2aUdHZFd0Z1ppWGJBKy9LdDNSa3ZzdkkvVEc5MDRMa0hxUUJuYk1yZ01FRWZ6TmU1bFNuRApiUFN3TDBxYjBXTUlYTklvUVpOSkVud1FyL09rQWxBNE1ETUFkUVczL3ZVOERTWHFCK0dVL3pod0xOYjJyRktTClZMdTE1aE5TY0xQNGNSMW5MZmlZMTluZ2xDQmxKQ0pjTFFEZXB3Vm5YYms1T2NRY0drbWRJOFNBaXJKYm5zbnoKUy9XeGQyUUFBRnBpU1FvL0x0Ym1LNTNNOThmc3U0TDgKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=</prv>
   </cert>
-  
-  <!-- Syslog -->
   <syslog/>
 </opnsense>
+

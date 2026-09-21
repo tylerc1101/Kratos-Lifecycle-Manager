@@ -1,0 +1,443 @@
+---
+- name: Create OPNsense VM
+  hosts: klm_host
+  gather_facts: false
+  become: true
+
+  pre_tasks:
+
+    # ============================================================
+    # Load Bundle Configuration
+    # ============================================================
+
+    - name: Load bundle variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars.yml"
+
+    - name: Apply environment bundle overrides
+      ansible.builtin.set_fact:
+        bundle: >-
+          {{
+            bundle_vars |
+            combine(
+              bundle_overrides | default({}),
+              recursive=true
+            )
+          }}
+
+  vars:
+    opnsense_name: "{{ bundle.opnsense.hostname }}"
+
+    opnsense_dir: "{{ bundle.libvirt.dirs.opnsense }}"
+
+    opnsense_config: >-
+      {{ opnsense_dir }}/config.xml
+
+    opnsense_config_iso: >-
+      {{ opnsense_dir }}/{{ bundle.opnsense.vm.config_iso_name }}
+
+    opnsense_installer_iso: >-
+      {{ bundle.libvirt.dirs.config_images }}/{{ bundle.opnsense.iso_name }}
+
+    opnsense_disk: >-
+      {{ bundle.libvirt.dirs.images }}/{{ opnsense_name }}.qcow2
+
+  tasks:
+
+    # ============================================================
+    # Validate Files
+    # ============================================================
+
+    - name: Check OPNsense configuration exists
+      ansible.builtin.stat:
+        path: "{{ opnsense_config }}"
+      register: opnsense_config_stat
+
+    - name: Fail if OPNsense configuration does not exist
+      ansible.builtin.fail:
+        msg: >-
+          Unable to find OPNsense configuration at
+          {{ opnsense_config }}.
+          Run the OPNsense configuration preparation playbook first.
+      when: not opnsense_config_stat.stat.exists
+
+    - name: Check OPNsense installer ISO exists
+      ansible.builtin.stat:
+        path: "{{ opnsense_installer_iso }}"
+      register: opnsense_installer_stat
+
+    - name: Fail if OPNsense installer ISO does not exist
+      ansible.builtin.fail:
+        msg: >-
+          Unable to find OPNsense installer ISO at
+          {{ opnsense_installer_iso }}.
+      when: not opnsense_installer_stat.stat.exists
+
+
+    # ============================================================
+    # Check Existing VM
+    # ============================================================
+
+    - name: Get existing virtual machines
+      ansible.builtin.command:
+        cmd: virsh list --all --name
+      register: existing_vms
+      changed_when: false
+
+    - name: Determine if OPNsense already exists
+      ansible.builtin.set_fact:
+        opnsense_exists: >-
+          {{ opnsense_name in existing_vms.stdout_lines }}
+
+
+    # ============================================================
+    # Generate Configuration ISO
+    # ============================================================
+
+    - name: Generate OPNsense configuration ISO
+      ansible.builtin.command:
+        cmd: >-
+          genisoimage
+          -output {{ opnsense_config_iso }}
+          -volid {{ bundle.opnsense.vm.config_iso_volume }}
+          -joliet
+          -rock
+          -graft-points
+          /conf/config.xml={{ opnsense_config }}
+      when: not opnsense_exists
+
+    - name: Set ownership on OPNsense configuration ISO
+      ansible.builtin.file:
+        path: "{{ opnsense_config_iso }}"
+        owner: "{{ bundle.libvirt.qemu_user }}"
+        group: "{{ bundle.libvirt.qemu_group }}"
+        mode: "0644"
+      when: not opnsense_exists
+
+    - name: Restore SELinux context on OPNsense configuration ISO
+      ansible.builtin.command:
+        cmd: "restorecon -v {{ opnsense_config_iso }}"
+      register: restore_config_iso
+      changed_when: restore_config_iso.stdout is search("Relabeled|reset")
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Create OPNsense VM
+    # ============================================================
+
+    - name: Create OPNsense VM
+      ansible.builtin.command:
+        cmd: >-
+          virt-install
+          --name {{ opnsense_name }}
+          --memory {{ bundle.opnsense.vm.memory_mb }}
+          --vcpus {{ bundle.opnsense.vm.vcpus }}
+          --cpu host-passthrough
+          --disk path={{ opnsense_disk }},size={{ bundle.opnsense.vm.disk_size_gb }},format=qcow2,bus=virtio
+          --disk {{ opnsense_config_iso }},device=cdrom,bus=ide
+          --cdrom {{ opnsense_installer_iso }}
+          --os-variant {{ bundle.opnsense.vm.os_variant }}
+          --network bridge={{ bundle.mgmt_bridge }},model=virtio
+          --network bridge={{ bundle.wan_bridge }},model=virtio
+          --network bridge={{ bundle.idrac_bridge }},model=virtio
+          --noautoconsole
+          --autostart
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Wait for Installer
+    # ============================================================
+
+    - name: Wait for OPNsense installer to boot
+      ansible.builtin.pause:
+        seconds: 180
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Installer Login
+    # ============================================================
+
+    - name: Enter installer username
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_I KEY_N KEY_S KEY_T KEY_A KEY_L KEY_L KEY_E KEY_R KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Enter installer password
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_O KEY_P KEY_N KEY_S KEY_E KEY_N KEY_S KEY_E KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Wait for installer login
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Import Configuration
+    # ============================================================
+
+    - name: Confirm installer language
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Select import configuration
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_DOWN KEY_DOWN KEY_DOWN KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Wait for configuration import menu
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+    - name: Select configuration ISO
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_DOWN KEY_DOWN KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Wait for configuration import
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Install OPNsense
+    # ============================================================
+
+    - name: Confirm configuration import and installation
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_ENTER KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Wait for disk selection
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+    - name: Select installation filesystem
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Select installation disk
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_SPACE KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Accept installation warning
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_LEFT KEY_ENTER
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Wait for Installation
+    # ============================================================
+
+    - name: Wait for OPNsense installation to complete
+      ansible.builtin.pause:
+        seconds: 180
+      when: not opnsense_exists
+
+    - name: Finish OPNsense installation
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_DOWN KEY_ENTER
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Wait for Shutdown
+    # ============================================================
+
+    - name: Wait for OPNsense to shut down
+      ansible.builtin.command:
+        cmd: "virsh domstate {{ opnsense_name }}"
+      register: opnsense_state
+      until: "'shut off' in opnsense_state.stdout"
+      retries: 30
+      delay: 10
+      changed_when: false
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Eject Configuration ISO
+    # ============================================================
+
+    - name: Find OPNsense configuration ISO device
+      ansible.builtin.shell: |
+        virsh domblklist {{ opnsense_name }} --details |
+        awk '$2 == "cdrom" && $4 == "{{ opnsense_config_iso }}" {print $3}'
+      register: config_iso_device
+      changed_when: false
+      failed_when: config_iso_device.stdout | trim == ""
+      when: not opnsense_exists
+
+    - name: Eject OPNsense configuration ISO
+      ansible.builtin.command:
+        cmd: >-
+          virsh change-media
+          {{ opnsense_name }}
+          {{ config_iso_device.stdout | trim }}
+          --eject
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Start Installed VM
+    # ============================================================
+
+    - name: Start OPNsense
+      ansible.builtin.command:
+        cmd: "virsh start {{ opnsense_name }}"
+      when: not opnsense_exists
+
+    - name: Wait for OPNsense to boot
+      ansible.builtin.pause:
+        seconds: 120
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Login to Installed OPNsense
+    # ============================================================
+
+    - name: Enter root username
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_R KEY_O KEY_O KEY_T KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Enter root password part one
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_K KEY_R KEY_A KEY_T KEY_O KEY_S KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Wait for OPNsense menu
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Renew WebGUI Certificate
+    # ============================================================
+
+    - name: Enter OPNsense shell
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_8 KEY_ENTER
+      when: not opnsense_exists
+
+    - name: Wait for shell
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+    - name: Enter configctl command - configctl
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_C KEY_O KEY_N KEY_F KEY_I KEY_G KEY_C KEY_T KEY_L
+
+    - name: Enter configctl command - webgui
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_SPACE
+          KEY_W KEY_E KEY_B KEY_G KEY_U KEY_I
+
+    - name: Enter configctl command - restart
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_SPACE
+          KEY_R KEY_E KEY_S KEY_T KEY_A KEY_R KEY_T
+
+    - name: Enter configctl command - renew
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          KEY_SPACE
+          KEY_R KEY_E KEY_N KEY_E KEY_W
+          KEY_ENTER
+
+    - name: Wait for certificate renewal
+      ansible.builtin.pause:
+        seconds: 5
+      when: not opnsense_exists
+
+    - name: Exit OPNsense shell
+      ansible.builtin.command:
+        cmd: >-
+          virsh send-key {{ opnsense_name }}
+          --codeset linux
+          --holdtime 500
+          KEY_LEFTCTRL KEY_D
+      when: not opnsense_exists
+
+
+    # ============================================================
+    # Complete
+    # ============================================================
+
+    - name: OPNsense installation status
+      ansible.builtin.debug:
+        msg: >-
+          OPNsense installation complete.
+          VM {{ opnsense_name }} is running.
+      when: not opnsense_exists
+
+    - name: OPNsense already exists
+      ansible.builtin.debug:
+        msg: >-
+          OPNsense VM {{ opnsense_name }} already exists.
+          Installation was skipped.
+      when: opnsense_exists

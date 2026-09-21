@@ -5,7 +5,7 @@ bundle_vars:
   # Networking
   # ============================================================
 
-  wan_interface: eno12409
+  wan_interface: eno8303
   wan_bridge: br-wan
 
   mgmt_interface: eno12399
@@ -16,12 +16,11 @@ bundle_vars:
   idrac_bridge: br-iDRAC
   idrac_address: 192.168.0.4/24
 
-  # Assumed OpenSpace internal network
+  # OpenSpace internal network
   mgmt_network: 192.168.2.0/24
   mgmt_cidr: 24
   mgmt_gateway: 192.168.2.1
   mgmt_dns: 192.168.2.1
-
 
   # ============================================================
   # Libvirt
@@ -39,9 +38,8 @@ bundle_vars:
       vm_config: /var/lib/libvirt/config/vm_config
       opnsense: /var/lib/libvirt/config/vm_config/opnsense
 
-
   # ============================================================
-  # VM Deployment
+  # OpenSpace VMs
   # ============================================================
 
   vm:
@@ -58,7 +56,6 @@ bundle_vars:
         memory_mb: 32768
         vcpus: 16
 
-
   # ============================================================
   # OPNsense
   # ============================================================
@@ -66,9 +63,17 @@ bundle_vars:
   opnsense:
     hostname: opnsense
     iso_name: OPNsense-24.7-dvd-amd64.iso
-    template_name: config_template.xml
+    template_name: config_template.xml.j2
 
     interfaces:
       wan: vtnet1
       lan: vtnet0
       opt1: vtnet2
+
+    vm:
+      memory_mb: 8192
+      vcpus: 4
+      disk_size_gb: 100
+      os_variant: freebsd14.0
+      config_iso_name: opnsense_config.iso
+      config_iso_volume: opnsense-config
