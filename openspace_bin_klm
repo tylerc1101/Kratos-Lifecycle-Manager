@@ -9,7 +9,7 @@ KLM_CONFIG="${KLM_ROOT}/config"
 KLM_ENGINE="${KLM_ROOT}/engine"
 KLM_ENVIRONMENTS="${KLM_ROOT}/environments"
 KLM_REPOS="${KLM_ROOT}/repos"
-KLM_SECRETS="${KLM_ROOT}/secrets"
+KLM_SSH="${KLM_ROOT}/.ssh"
 KLM_STAGING="${KLM_ROOT}/staging"
 
 KLM_STATE="${KLM_ROOT}/state"
@@ -232,7 +232,7 @@ start_klm() {
         -v "${KLM_CONFIG}:${KLM_CONFIG}:ro,Z" \
         -v "${KLM_ENVIRONMENTS}:${KLM_ENVIRONMENTS}:ro,Z" \
         -v "${KLM_REPOS}:${KLM_REPOS}:Z" \
-        -v "${KLM_SECRETS}:${KLM_SECRETS}:ro,Z" \
+        -v "${KLM_SSH}:${KLM_SSH}:ro,Z" \
         -v "${KLM_STAGING}:${KLM_STAGING}:ro,z" \
         -v "${KLM_STATE}:${KLM_STATE}:Z" \
         "${engine_image}" \

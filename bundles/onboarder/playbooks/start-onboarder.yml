@@ -67,7 +67,7 @@
 
     - name: Copy VM configuration into onboarder cache
       ansible.builtin.copy:
-        src: ../templates/vm.json
+        src: ../templates/{{ reference_arch }}/vm.json.j2
         dest: "{{ klm_home }}/state/onboarder/.cache/vm.json"
         owner: kratos
         group: kratos
@@ -83,11 +83,10 @@
         mode: "0600"
 
     - name: Load onboarder container image
-      become_user: kratos
       ansible.builtin.command:
         cmd: >-
           podman load
-          -i {{ klm_home }}/bundles/onboarder/images/{{ onboarder_image }}
+          -i {{ klm_home }}/bundles/onboarder/images/{{ bundle.onboarder_image }}
       environment:
         TMPDIR: /var/opt
       register: onboarder_image_load
@@ -97,8 +96,16 @@
       ansible.builtin.debug:
         var: onboarder_image_load.stdout
 
+    - name: Set onboarder image reference
+      ansible.builtin.set_fact:
+        onboarder_image_ref: >-
+          {{
+            onboarder_image_load.stdout
+            | regex_search('Loaded image: (.+)', '\1')
+            | first
+          }}
+
     - name: Run onboarder container
-      become_user: kratos
       ansible.builtin.command:
         cmd: >-
           podman run
@@ -143,7 +150,6 @@
 
 
     - name: Copy KLM scripts into KLM engine container
-      become_user: kratos
       ansible.builtin.command:
         cmd: >-
           podman cp
@@ -158,7 +164,6 @@
 
 
     - name: Set KLM script permissions inside container
-      become_user: kratos
       ansible.builtin.command:
         cmd: >-
           podman exec

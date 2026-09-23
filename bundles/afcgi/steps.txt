@@ -21,23 +21,28 @@ Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the 
 
 
 # Infrastructure Setup
+[Workflow AFCGI - Ground Infrastructure Install]
+[Workflow Basekit - Infrastructure Install]
 [afcgi bundle] - mgmt-kvm-networking.yml    (Builds bridges on mgmt-kvm)
-[afcgi bundle] - stage-repos.yml            (Copies repo files to /opt/openspace/repos on mgmt-kvm)
+[afcgi bundle] - stage-repos.yml (include limits option for task template)            (Copies repo files to /opt/openspace/repos on mgmt-kvm)
 [basekit bundle] - bootstrap-mgmt-kvm.yml   (Initial setup of mgmt-kvm, installs packages, sets up repos, etc)
 [basekit bundle] - prepare-opnsense.yml     (Stages opnsense iso and creates config.xml)
 [afcgi bundle] - change-opnsense-settings.yml (AFCGI specific settings for opnsense)
 [basekit bundle] - deploy-opnsense.yml      (Deploys opnsense vm on mgmt-kvm)
 [basekit bundle] - stage-rhel-image.yml     (Stages rhel qcow2 image on mgmt-kvm)
-[basekit bundle] - deploy-vms.yml [limit=mcm] (Deploys MCM VM on mgmt-kvm and configures it)
-[basekit bundle] - bootstrap-nodes.yml [limit=mcm] (Deploys NTP and Repo files and sets hostname)
-[basekit bundle] - deploy-vms.yml [limit=osms]
-[basekit bundle] - bootstrap-nodes.yml [limit=osms]
-[basekit bundle] - bootstrap-nodes.yml [limit=osdc]
+[basekit bundle] - deploy-vms.yml (include limits option for task template)[limit=mcm] (Deploys MCM VM on mgmt-kvm and configures it)
+[basekit bundle] - bootstrap-nodes.yml (include limits option for task template)[limit=mcm] (Deploys NTP and Repo files and sets hostname)
+[basekit bundle] - deploy-vms.yml (include limits option for task template)[limit=osms]
+[basekit bundle] - bootstrap-nodes.yml (include limits option for task template)[limit=osms]
+[basekit bundle] - bootstrap-nodes.yml (include limits option for task template)[limit=osdc]
+[End Basekit - Infrastructure Install Workflow (Dont include AFCGI bundle tasks)]
+[End AFCGI - Ground Infrastructure Install Workflow]
+
 
 # Onboarder deployment
 [onboarder bundle] - generate-ssh-key.yml     (Creates ssh key for onboarder)
-[onboarder bundle] - node-prep.yml [limit=mcm]  (Prepares MCM node for onboarder deployment)
-[onboarder bundle] - push-ssh-key.yml [limit=mcm] (Pushes ssh key to mgmt-kvm)
+[onboarder bundle] - node-prep.yml (include limits option for task template)[limit=mcm]  (Prepares MCM node for onboarder deployment)
+[onboarder bundle] - push-ssh-key.yml (include limits option for task template)[limit=mcm] (Pushes ssh key to mgmt-kvm)
 [onboarder bundle] - start-onboarder.yml       (Setups up deployment files for onboarder container)
 [onboarder bundle] - deploy-kubernetes.sh
 [onboarder bundle] - deploy-harbor.sh

@@ -1,0 +1,55 @@
+---
+all:
+  vars:
+    env_name: lab
+    domain_name: lab.kratos
+    reference_arch: basekit
+
+    klm_home: /opt/openspace
+    openspace_user: kratos
+
+    ntp_servers:
+      - 192.168.2.100
+
+    wan_dns:
+      servers:
+        - 10.243.25.50
+        - 10.243.25.53
+      private_domains:
+        - kratosdefense.com
+        - elb.us-west-2.amazonaws.com
+
+    opnsense:
+      wan_ip: 10.243.77.223
+      gateway: 10.243.76.1
+      cidr: 23
+
+    ssh_key: rancher_ssh_key
+
+    bundle_overrides: {}
+
+  children:
+    klm_host:
+      hosts:
+        mgmt-kvm:
+          ansible_host: 10.243.77.213
+
+    vms:
+      children:
+        mcm:
+          hosts:
+            mcm1:
+              ansible_host: 192.168.2.8
+
+        osms:
+          hosts:
+            osms1:
+              ansible_host: 192.168.2.9
+
+    osdc:
+      hosts:
+        osdc1:
+          ansible_host: 192.168.2.16
+
+        osdc2:
+          ansible_host: 192.168.2.17

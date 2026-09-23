@@ -30,42 +30,42 @@ templates:
     description: Prepare the Onboarder deployment container and configuration.
     view: Onboarder Tasks
     repository: Onboarder
-    playbook: actions/container/prep-container.yml
+    playbook: playbooks/start-onboarder.yml
 
   - name: Deploy Kubernetes
     description: Deploy the management Kubernetes cluster.
     view: Onboarder Tasks
     repository: Onboarder
     app: bash
-    playbook: scripts/deploy-kubernetes.sh
+    playbook: scripts/run-make.sh
 
   - name: Deploy Harbor
     description: Deploy Harbor.
     view: Onboarder Tasks
     repository: Onboarder
     app: bash
-    playbook: scripts/deploy-harbor.sh
+    playbook: scripts/run-make.sh
 
   - name: Deploy Rancher
     description: Deploy Rancher.
     view: Onboarder Tasks
     repository: Onboarder
     app: bash
-    playbook: scripts/deploy-rancher.sh
+    playbook: scripts/run-make.sh
 
   - name: Deploy Gitea
     description: Deploy Gitea.
     view: Onboarder Tasks
     repository: Onboarder
     app: bash
-    playbook: scripts/deploy-gitea.sh
+    playbook: scripts/run-make.sh
 
   - name: Deploy ArgoCD
     description: Deploy ArgoCD.
     view: Onboarder Tasks
     repository: Onboarder
     app: bash
-    playbook: scripts/deploy-argocd.sh
+    playbook: scripts/run-make.sh
 
   - name: Deploy OpenSpace Cluster
     description: Deploy an OpenSpace Kubernetes cluster.

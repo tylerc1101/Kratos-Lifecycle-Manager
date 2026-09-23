@@ -1,7 +1,6 @@
 ---
 - name: Generate SSH key
-  hosts: localhost
-  connection: local
+  hosts: mgmt-kvm
   gather_facts: false
   become: true
 

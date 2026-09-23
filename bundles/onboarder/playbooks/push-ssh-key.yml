@@ -8,5 +8,5 @@
       ansible.posix.authorized_key:
         user: "{{ openspace_user }}"
         state: present
-        key: "{{ lookup('file', klm_home + '/secrets/secrets/' + ssh_key + '.pub') }}"
+        key: "{{ lookup('file', klm_home + '/.ssh/' + ssh_key + '.pub') }}"
         manage_dir: true

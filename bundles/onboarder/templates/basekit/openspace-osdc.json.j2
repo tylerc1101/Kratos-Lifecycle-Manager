@@ -1,7 +1,7 @@
 {
   "CustomParameters": {
     "istioTrustDomain": "cluster.local",
-    "kubevipInterface": "ens2f0",
+    "kubevipInterface": "{{ bundle.nic_interface }}",
     "mtlsPeerAuthEnable": true,
     "selinux": true,
     "singleNode": false
@@ -31,6 +31,6 @@
       "SSHSecretUsername": "{{ openspace_user }}"
     }
   ],
-  "VIPAddress": "192.168.2.251",
+  "VIPAddress": "{{ bundle.vip_address }}",
   "VIPDNS": "osdc.{{ domain_name }}"
 }

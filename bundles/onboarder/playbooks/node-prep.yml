@@ -24,11 +24,18 @@
     # Common MCM / OSMS / OSDC configuration
     # ------------------------------------------------------------------
 
+    - name: Copy RKE2 SELinux RPM to /tmp
+      ansible.builtin.copy:
+        src: "../images/{{ bundle['rke2-selinux-rpm'] }}"
+        dest: "/tmp/{{ bundle['rke2-selinux-rpm'] }}"
+        remote_src: false
+        owner: root
+        group: root
+        mode: "0644"
+    
     - name: Install RKE2 SELinux policy
-      ansible.builtin.dnf:
-        name: "../images/{{ rke2-selinux-rpm }}"
-        state: present
-        disable_gpg_check: true
+      ansible.builtin.command:
+        cmd: "rpm -i /tmp/{{ bundle['rke2-selinux-rpm'] }}"
 
     - name: Install required Kubernetes packages
       ansible.builtin.dnf:

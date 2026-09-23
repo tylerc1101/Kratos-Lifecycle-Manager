@@ -1,6 +1,8 @@
-rke2-selinux-rpm: "rke2-selinux-0.22-1.el9.noarch.rpm"
-onboarder-image: "onboarder-full_v3.9.0.tar.gz"
-rke2_api_vip: "192.168.2.253"
-wildcard_ingress_vip: "192.168.2.254"
-nic_interface: "enp1s0"
-vip_address: "192.168.2.250"
+---
+bundle_vars:
+  rke2_selinux_rpm: "rke2-selinux-0.22-1.el9.noarch.rpm"
+  onboarder_image: "onboarder-full_v3.9.0.tar.gz"
+  rke2_api_vip: "192.168.2.253"
+  wildcard_ingress_vip: "192.168.2.254"
+  nic_interface: "enp1s0"
+  vip_address: "192.168.2.250"
