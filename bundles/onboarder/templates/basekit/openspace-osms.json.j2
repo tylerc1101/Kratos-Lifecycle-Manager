@@ -1,0 +1,30 @@
+{
+  "CustomParameters": {
+    "istioTrustDomain": "cluster.local",
+    "kubevipInterface": "{{ nic_interface }}",
+    "mtlsPeerAuthEnable": true,
+    "selinux": true,
+    "singleNode": true
+  },
+  "NodeCount": "1",
+  "ControllerCount": "1",
+  "CloudProvider": "",
+  "ClusterName": "openspace-osms",
+  "EnvDirName": "{{ env_name }}",
+  "FlavorDirName": "00-osms-ssh",
+  "RancherURL": "https://rancher.mcm.{{ domain_name }}",
+  "RegistryBase": "harbor.mcm.{{ domain_name }}",
+  "RegistryPath": "openspace-infra",
+  "RepoURL": "https://git.mcm.{{ domain_name }}/Openspace-Substrate/OSMS-Gitops",
+  "SSHSpecs": [
+    {
+      "MachineIP": "192.168.2.9",
+      "MachineName": "osms1",
+      "RegistrationCommand": " ",
+      "SSHSecretName": "osms-ssh",
+      "SSHSecretUsername": "kratos"
+    }
+  ],
+  "VIPAddress": "{{ vip_address }}",
+  "VIPDNS": "osms.{{ domain_name }}"
+}

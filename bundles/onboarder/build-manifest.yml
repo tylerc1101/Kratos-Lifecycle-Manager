@@ -1,5 +1,0 @@
-# Optional build settings. The folder name is the bundle name.
-version: "3.8.0"
-required:
-  - Taskfile.yml
-  - actions

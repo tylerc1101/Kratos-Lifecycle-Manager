@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+make ansible-deploy-rke2-cluster ENVIRONMENT={{ env_name }}
+make bootstrap-container-images-run ENVIRONMENT={{ env_name }}

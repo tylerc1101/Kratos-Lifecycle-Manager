@@ -209,7 +209,7 @@
       <descr>System Administrator</descr>
       <scope>system</scope>
       <groupname>admins</groupname>
-      <password>$2y$11$ppIBzuQ9vdrnrnim2lofSuYJuA..OOAdeN0JhE8zo1QpamrYLp9zS</password>
+      <password>$2y$11$TJq4GjnYCVY5wSZ2d5fhV.2LMxzdqULbqEFJMUzGzziN5L4n/hVqe</password>
       <uid>0</uid>
       <expires/>
       <authorizedkeys/>
@@ -1211,7 +1211,7 @@
         <loglocalactions/>
         <logverbosity>1</logverbosity>
         <valloglevel>0</valloglevel>
-        <privatedomain/>
+        <privatedomain>{{ wan_dns.private_domains | default([]) | join(',') }}</privatedomain>
         <privateaddress>0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,169.254.0.0/16,172.16.0.0/12,192.0.2.0/24,192.168.0.0/16,198.18.0.0/15,198.51.100.0/24,203.0.113.0/24,233.252.0.0/24,::1/128,2001:db8::/32,fc00::/8,fd00::/8,fe80::/10</privateaddress>
         <insecuredomain/>
         <msgcachesize/>
@@ -1247,21 +1247,18 @@
         <enabled/>
       </forwarding>
       <dots>
-{% for forward in wan_dns.forwarding | default([]) %}
-{% set forward_servers = forward.servers | default(wan_dns.servers, true) %}
-{% for server in forward_servers %}
-        <dot uuid="{{ (forward.domain ~ '-' ~ server) | to_uuid }}">
+{% for server in wan_dns.servers | default([]) %}
+        <dot uuid="{{ ('wan-dns-' ~ server) | to_uuid }}">
           <enabled>1</enabled>
           <type>forward</type>
-          <domain>{{ forward.domain }}</domain>
+          <domain/>
           <server>{{ server }}</server>
           <port>53</port>
           <verify/>
           <forward_tcp_upstream>0</forward_tcp_upstream>
           <forward_first>0</forward_first>
-          <description>{{ forward.description | default('') }}</description>
+          <description>WAN DNS {{ server }}</description>
         </dot>
-{% endfor %}
 {% endfor %}
       </dots>
       <hosts>

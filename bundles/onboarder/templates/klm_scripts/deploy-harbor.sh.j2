@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{ env_name }}
+make load-darksite-bundles ENVIRONMENT={{ env_name }}

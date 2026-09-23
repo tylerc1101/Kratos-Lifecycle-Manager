@@ -7,6 +7,18 @@
   tasks:
 
     # ============================================================
+    # /etc/resolv.conf Configuration
+    # ============================================================
+    - name: Configure DNS resolver
+      ansible.builtin.copy:
+        dest: /etc/resolv.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          nameserver 192.168.2.1
+
+    # ============================================================
     # Repository Configuration
     # ============================================================
 

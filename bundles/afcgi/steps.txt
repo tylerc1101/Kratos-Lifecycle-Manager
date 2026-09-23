@@ -26,7 +26,7 @@ Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the 
 [basekit bundle] - bootstrap-mgmt-kvm.yml   (Initial setup of mgmt-kvm, installs packages, sets up repos, etc)
 [basekit bundle] - prepare-opnsense.yml     (Stages opnsense iso and creates config.xml)
 [afcgi bundle] - change-opnsense-settings.yml (AFCGI specific settings for opnsense)
-[basekit bundle] - install_opnsense.sh      (Deploys opnsense vm on mgmt-kvm)
+[basekit bundle] - deploy-opnsense.yml      (Deploys opnsense vm on mgmt-kvm)
 [basekit bundle] - stage-rhel-image.yml     (Stages rhel qcow2 image on mgmt-kvm)
 [basekit bundle] - deploy-vms.yml [limit=mcm] (Deploys MCM VM on mgmt-kvm and configures it)
 [basekit bundle] - bootstrap-nodes.yml [limit=mcm] (Deploys NTP and Repo files and sets hostname)
@@ -38,7 +38,7 @@ Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the 
 [onboarder bundle] - generate-ssh-key.yml     (Creates ssh key for onboarder)
 [onboarder bundle] - node-prep.yml [limit=mcm]  (Prepares MCM node for onboarder deployment)
 [onboarder bundle] - push-ssh-key.yml [limit=mcm] (Pushes ssh key to mgmt-kvm)
-[onboarder bundle] - prep-container.yml       (Setups up deployment files for onboarder container)
+[onboarder bundle] - start-onboarder.yml       (Setups up deployment files for onboarder container)
 [onboarder bundle] - deploy-kubernetes.sh
 [onboarder bundle] - deploy-harbor.sh
 [onboarder bundle] - deploy-rancher.sh

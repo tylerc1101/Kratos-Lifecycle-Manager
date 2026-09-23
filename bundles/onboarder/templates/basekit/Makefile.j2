@@ -1,0 +1,26 @@
+# Values are: NONE, AWS (for aws-ccm envs), or AWS-MANUAL (i.e., no aws-ccm):
+CLOUD_PROVIDER                = NONE
+
+# Disable wireguard only if your system cannot load the wireguard kernel module:
+WIREGUARD_ENABLED             = false
+
+# Currently supported: 3 or 1.  Use the normal Rancher UI for registering additional nodes.
+NODE_COUNT                    = 1
+HELM_harbor_replicas          = 1
+HELM_longhorn_replicas        = 1
+HELM_cattle_replicas          = 1
+
+# Used by all tooling to build MCM nodes. Be sure to preload your ssh pubkey on all nodes:
+SSH_USERNAME                  = "{{ openspace_user }}"
+
+# Both RKE2_API values are added to the self-signed cert as SAN.
+# Keep the WILDCARD_INGRESS_VIP the same as RKE2_API_VIP unless you know you REQUIRE something different.
+# Note: RKE2_API_VIP is only used in the SubjectAltName in the TLS certs now, and is kept for legacy purposes.
+RKE2_API_VIP                  = "{{ rke2_api_vip }}"
+RKE2_API_DNS                  = "api.mcm.{{ domain_name }}"
+WILDCARD_INGRESS_VIP          = "{{ wildcard_ingress_vip }}"
+WILDCARD_INGRESS_DNS          = "mcm.{{ domain_name }}"
+
+# VM_NIC and CILIUM are the same intf in almost every case:
+VM_NIC_INTERFACE              = "{{ nic_interface }}"
+CILIUM_DEVICE                 = "{{ nic_interface }}"

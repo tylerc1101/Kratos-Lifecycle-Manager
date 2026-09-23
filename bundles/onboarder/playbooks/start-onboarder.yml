@@ -1,0 +1,179 @@
+---
+- name: Stage and run KLM onboarder
+  hosts: klm_host
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Load bundle variables
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../vars.yml"
+
+    - name: Apply environment bundle overrides
+      ansible.builtin.set_fact:
+        bundle: >-
+          {{
+            bundle_vars |
+            combine(
+              bundle_overrides | default({}),
+              recursive=true
+            )
+          }}
+
+  tasks:
+    - name: Create onboarder directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: kratos
+        group: kratos
+        mode: "0755"
+      loop:
+        - "{{ klm_home }}/state/onboarder"
+        - "{{ klm_home }}/state/onboarder/.cache"
+        - "{{ klm_home }}/state/onboarder/klm_scripts"
+
+    - name: Template onboarder configuration files
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "{{ klm_home }}/state/onboarder/{{ item.dest }}"
+        owner: kratos
+        group: kratos
+        mode: "0644"
+      loop:
+        - src: "../templates/{{ reference_arch }}/Makefile.j2"
+          dest: Makefile
+
+        - src: "../templates/{{ reference_arch }}/openspace-osdc.json.j2"
+          dest: openspace-osdc.json
+
+        - src: "../templates/{{ reference_arch }}/openspace-osms.json.j2"
+          dest: openspace-osms.json
+
+    - name: Copy onboarder files
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ klm_home }}/state/onboarder/{{ item.dest }}"
+        owner: kratos
+        group: kratos
+        mode: "{{ item.mode }}"
+      loop:
+        - src: ../files/.sops.yaml
+          dest: .sops.yaml
+          mode: "0644"
+
+        - src: ../files/secrets.yaml
+          dest: secrets.yaml
+          mode: "0600"
+
+    - name: Copy VM configuration into onboarder cache
+      ansible.builtin.copy:
+        src: ../templates/vm.json
+        dest: "{{ klm_home }}/state/onboarder/.cache/vm.json"
+        owner: kratos
+        group: kratos
+        mode: "0644"
+
+    - name: Copy SSH key into onboarder cache
+      ansible.builtin.copy:
+        src: "{{ klm_home }}/.ssh/{{ ssh_key }}"
+        dest: "{{ klm_home }}/state/onboarder/.cache/{{ ssh_key }}"
+        remote_src: true
+        owner: kratos
+        group: kratos
+        mode: "0600"
+
+    - name: Load onboarder container image
+      become_user: kratos
+      ansible.builtin.command:
+        cmd: >-
+          podman load
+          -i {{ klm_home }}/bundles/onboarder/images/{{ onboarder_image }}
+      environment:
+        TMPDIR: /var/opt
+      register: onboarder_image_load
+      changed_when: "'Loaded image' in onboarder_image_load.stdout"
+
+    - name: Show loaded onboarder image
+      ansible.builtin.debug:
+        var: onboarder_image_load.stdout
+
+    - name: Run onboarder container
+      become_user: kratos
+      ansible.builtin.command:
+        cmd: >-
+          podman run
+          --rm
+          --name klm-onboarder
+          --volume {{ klm_home }}/state/onboarder:/docker-workspace/config/{{ env_name }}:Z
+          {{ onboarder_image_ref }}
+      environment:
+        TMPDIR: /var/opt
+
+    - name: Create temporary KLM scripts directory
+      ansible.builtin.file:
+        path: /tmp/klm_scripts
+        state: directory
+        owner: kratos
+        group: kratos
+        mode: "0755"
+
+
+    - name: Stage onboarder KLM scripts on KLM host
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "/tmp/klm_scripts/{{ item.dest }}"
+        owner: kratos
+        group: kratos
+        mode: "0755"
+      loop:
+        - src: ../templates/klm_scripts/deploy-kubernetes.sh.j2
+          dest: deploy-kubernetes
+
+        - src: ../templates/klm_scripts/deploy-harbor.sh.j2
+          dest: deploy-harbor
+
+        - src: ../templates/klm_scripts/deploy-rancher.sh.j2
+          dest: deploy-rancher
+
+        - src: ../templates/klm_scripts/deploy-gitea.sh.j2
+          dest: deploy-gitea
+
+        - src: ../templates/klm_scripts/deploy-argocd.sh.j2
+          dest: deploy-argocd
+
+
+    - name: Copy KLM scripts into KLM engine container
+      become_user: kratos
+      ansible.builtin.command:
+        cmd: >-
+          podman cp
+          /tmp/klm_scripts/{{ item }}
+          onboarder:/usr/local/bin/{{ item }}
+      loop:
+        - deploy-kubernetes
+        - deploy-harbor
+        - deploy-rancher
+        - deploy-gitea
+        - deploy-argocd
+
+
+    - name: Set KLM script permissions inside container
+      become_user: kratos
+      ansible.builtin.command:
+        cmd: >-
+          podman exec
+          --user root
+          klm-engine
+          chmod 0755 /usr/local/bin/{{ item }}
+      loop:
+        - deploy-kubernetes
+        - deploy-harbor
+        - deploy-rancher
+        - deploy-gitea
+        - deploy-argocd
+
+
+    - name: Remove temporary KLM scripts directory
+      ansible.builtin.file:
+        path: /tmp/klm_scripts
+        state: absent

@@ -3,6 +3,7 @@ all:
   vars:
     env_name: skct2
     domain_name: base-kit-2.kratos
+    reference_arch: basekit
 
     klm_home: /opt/openspace
     openspace_user: kratos
@@ -10,20 +11,13 @@ all:
     ntp_servers:
       - 192.168.2.100
 
-    # DNS reachable through br-wan.
-    # br-wan uses wan_dns.servers directly.
-    # OPNsense forwarding entries inherit the same servers unless an
-    # individual forwarding entry provides its own servers list.
     wan_dns:
       servers:
         - 10.243.25.50
         - 10.243.25.53
-      search_domains:
-        - rtlogic.com
-
-      forwarding:
-        - domain: rtlogic.com
-          description: Kratos Dev DNS
+      private_domains:
+        - kratosdefense.com
+        - elb.us-west-2.amazonaws.com
 
     opnsense:
       wan_ip: 10.243.76.221

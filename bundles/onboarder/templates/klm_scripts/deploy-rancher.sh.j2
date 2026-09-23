@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{ env_name }}
+make terraform-rancher-bootstrap-apply ENVIRONMENT={{ env_name }}

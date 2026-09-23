@@ -1,0 +1,36 @@
+{
+  "CustomParameters": {
+    "istioTrustDomain": "cluster.local",
+    "kubevipInterface": "ens2f0",
+    "mtlsPeerAuthEnable": true,
+    "selinux": true,
+    "singleNode": false
+  },
+  "NodeCount": "2",
+  "ControllerCount": "1",
+  "ClusterName": "openspace-osdc",
+  "EnvDirName": "{{ env_name }}",
+  "FlavorDirName": "01-osdc-ssh",
+  "RancherURL": "https://rancher.mcm.{{ domain_name }}",
+  "RegistryBase": "harbor.mcm.{{ domain_name }}",
+  "RegistryPath": "openspace-infra",
+  "RepoURL": "https://git.mcm.{{ domain_name }}/Openspace-Substrate/OSDC-Gitops",
+  "SSHSpecs": [
+    {
+      "MachineIP": "192.168.2.16",
+      "MachineName": "osdc1",
+      "RegistrationCommand": " ",
+      "SSHSecretName": "osdc-ssh",
+      "SSHSecretUsername": "{{ openspace_user }}"
+    },
+    {
+      "MachineIP": "192.168.2.17",
+      "MachineName": "osdc2",
+      "RegistrationCommand": " ",
+      "SSHSecretName": "osdc-ssh",
+      "SSHSecretUsername": "{{ openspace_user }}"
+    }
+  ],
+  "VIPAddress": "192.168.2.251",
+  "VIPDNS": "osdc.{{ domain_name }}"
+}

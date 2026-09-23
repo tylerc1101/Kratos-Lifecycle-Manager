@@ -1,8 +1,0 @@
----
-- name: Example onboarding automation
-  hosts: all
-  gather_facts: true
-  tasks:
-    - name: Show onboarding target
-      ansible.builtin.debug:
-        msg: "Onboarding {{ inventory_hostname }} ({{ ansible_distribution | default('unknown') }})"
