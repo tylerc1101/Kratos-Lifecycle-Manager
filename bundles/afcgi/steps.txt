@@ -21,6 +21,7 @@ Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the 
 
 
 # Infrastructure Setup
+[Workflow AFCGI - Full Install]
 [Workflow AFCGI - Ground Infrastructure Install]
 [Workflow Basekit - Infrastructure Install]
 [afcgi bundle] - mgmt-kvm-networking.yml    (Builds bridges on mgmt-kvm)
@@ -40,50 +41,39 @@ Run Workflow Install-SKCT2 (This is the end of the steps, but below is what the 
 
 
 # Onboarder deployment
+[Workflow Onboarder Deployment Full]
+[Workflow Onboarder Start]
 [onboarder bundle] - generate-ssh-key.yml     (Creates ssh key for onboarder)
-[onboarder bundle] - node-prep.yml (include limits option for task template)[limit=mcm]  (Prepares MCM node for onboarder deployment)
-[onboarder bundle] - push-ssh-key.yml (include limits option for task template)[limit=mcm] (Pushes ssh key to mgmt-kvm)
+[onboarder bundle] - node-prep.yml [limit=mcm]  (Prepares MCM node for onboarder deployment)
+[onboarder bundle] - push-ssh-key.yml [limit=mcm] (Pushes ssh key to mgmt-kvm)
 [onboarder bundle] - start-onboarder.yml       (Setups up deployment files for onboarder container)
-[onboarder bundle] - deploy-kubernetes.sh
-[onboarder bundle] - deploy-harbor.sh
-[onboarder bundle] - deploy-rancher.sh
-[onboarder bundle] - deploy-gitea.sh
-[onboarder bundle] - deploy-argocd.sh
+[End Onboarder Start Workflow]
+[onboarder bundle] - Pause and say run "deploy" in onboarder
+[onboarder bundle] - Pause and say "Add OSDC Cluster name to file in gitea"
+[onboarder bundle] - create-ssh-secret.yml
 
+[Workflow Onboarder Deploy OSMS]
 # Cluster deployment [OSMS]
 [onboarder bundle] - node-prep.yml [limit=osms]
+[onboarder bundle] - set-cacerts.yml
 [onboarder bundle] - push-ssh-key.yml [limit=osms]
 [onboarder bundle] - deploy-openspace-cluster [-e openspace-osms]
 [onboarder bundle] - approval [Did the cluster deploy successfully?]
 [onboarder bundle] - approval [Did argo cd deploy apps successfully?]
+[End Workflow Onboarder Deploy OSMS]
 
+[Workflow Onboarder Deploy OSDC]
 # Cluster Deployment [OSDC]
 [onboarder bundle] - node-prep.yml [limit=osdc]
+[onboarder bundle] - set-cacerts.yml
 [onboarder bundle] - push-ssh-key.yml [limit=osdc]
 [onboarder bundle] - deploy-openspace-cluster [-e openspace-osdc]
 [onboarder bundle] - approval [Did the cluster deploy successfully?]
 [onboarder bundle] - approval [Did argo cd deploy apps successfully?]
 [onboarder bundle] - post_osdc.yml
-
-# Deploy tooling
-[openspace bundle] - generate-config.yml
-[openspace bundle] - push-images.sh
-[openspace bundle] - start.sh
+[End Workflow Onboarder Deploy OSDC]
+[End Workflow Onboarder Deployment Full]
+[End Workflow AFCGI - Full Install]
 
 
-run env_prep.yml on all nodes (hostname, repos setup, /etc/resolv, chrony)
-
-onboarder steps:
-node-prep.yml
-    env osdc nic driver install
-    env playbook, change /etc/resolv back to br-mgmt
-prep-container.yml
-    setup config directory in /opt/openspace/onboarder_config
-    configure files in directory (onboarder and downstream)
-    create ssh_key and distribute
-    start onboarder with directory mounted /docker-workspace/config/{{ env }}
-run makes (Not playbook)
-    ??? maybe bash script using ssh_key to run a podman exec command?
-deploy downstream cluster
-    manual step? has a question that needs to be answered and cant with semaphore
-deploy openspace
+/etc/resolv might not work. Worst case just have onboarder start playbook set it

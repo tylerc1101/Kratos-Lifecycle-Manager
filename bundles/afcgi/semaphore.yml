@@ -7,8 +7,6 @@ repositories:
     url: file:///opt/openspace/environments/afcgi
     branch: main
 
-# Shared AFCGI view. Workflows placed here are contract/site orchestration
-# workflows rather than reusable capability workflows.
 views:
   - name: AFCGI
 
@@ -27,54 +25,50 @@ profiles:
         ssh_key: AFCGI SSH User
         become_key: AFCGI Root
 
-    # Keep a per-system view for AFCGI tasks that are useful to run directly.
     views:
       - name: "{system}"
 
     templates:
-      - name: "MGMT KVM Networking"
+      - name: MGMT KVM Networking
         description: Build the AFCGI management KVM network bridges.
-        view: "AFCGI"
+        view: AFCGI
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/mgmt-kvm-networking.yml
 
-      - name: "Stage Repositories"
-        description: Copy AFCGI repository files to /opt/openspace/repos on the selected host(s).
-        view: "AFCGI"
+      - name: Stage Repositories
+        description: Copy AFCGI repository files to /opt/openspace/repos on the management KVM host.
+        view: AFCGI
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/stage-repos.yml
-        allow_override_args_in_task: true
+        task_params:
+          allow_override_limit: true
+          limit: []
 
-      - name: "Change OPNSense Settings"
+      - name: Change OPNSense Settings
         description: Apply AFCGI-specific settings to the generated OPNSense configuration.
-        view: "AFCGI"
+        view: AFCGI
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/change-opnsense-settings.yml
 
     workflows:
-      # Semaphore 2.19 does not nest workflows. This workflow therefore
-      # references the same BaseKit task templates used by the standalone
-      # "BaseKit - Infrastructure Install" workflow and inserts the AFCGI
-      # site-specific steps where they belong.
-      - name: Ground Infrastructure Install
+      # Semaphore 2.19 does not nest workflows. Ground Infrastructure Install
+      # therefore references the BaseKit task templates directly and inserts
+      # AFCGI-specific tasks where they belong.
+      - name: AFCGI - Ground Infrastructure Install
         description: Build AFCGI ground infrastructure for the selected system.
         view: AFCGI
 
         nodes:
           - id: mgmt_kvm_networking
             type: task
-            template: "MGMT KVM Networking"
+            template: MGMT KVM Networking
 
           - id: stage_repositories
             type: task
-            template: "Stage Repositories"
-            task_params:
-              params:
-                limit:
-                  - mgmt-kvm
+            template: Stage Repositories
 
           - id: bootstrap_mgmt_kvm
             type: task
@@ -86,7 +80,7 @@ profiles:
 
           - id: change_opnsense_settings
             type: task
-            template: "Change OPNSense Settings"
+            template: Change OPNSense Settings
 
           - id: deploy_opnsense
             type: task
@@ -149,13 +143,244 @@ profiles:
           - {from: deploy_osms, to: bootstrap_osms, condition: on_success}
           - {from: bootstrap_osms, to: bootstrap_osdc, condition: on_success}
 
-  # Cloud intentionally remains separate. The AFCGI bundle can contain ground
-  # and cloud systems while each profile brings in its own dependencies and
-  # workflows.
+      # Full Install is flattened because Semaphore cannot invoke another
+      # workflow as a workflow node. It uses the same BaseKit and Onboarder
+      # task templates rather than duplicating task templates.
+      - name: AFCGI - Full Install
+        description: Run the complete AFCGI ground infrastructure and Onboarder deployment sequence.
+        view: AFCGI
+
+        nodes:
+          # ------------------------------------------------------------
+          # AFCGI Ground Infrastructure
+          # ------------------------------------------------------------
+          - id: mgmt_kvm_networking
+            type: task
+            template: MGMT KVM Networking
+
+          - id: stage_repositories
+            type: task
+            template: Stage Repositories
+
+          - id: bootstrap_mgmt_kvm
+            type: task
+            template: basekit::Bootstrap MGMT KVM
+
+          - id: prepare_opnsense
+            type: task
+            template: basekit::Prepare OPNSense
+
+          - id: change_opnsense_settings
+            type: task
+            template: Change OPNSense Settings
+
+          - id: deploy_opnsense
+            type: task
+            template: basekit::Deploy OPNSense
+
+          - id: stage_rhel_image
+            type: task
+            template: basekit::Stage RHEL Image
+
+          - id: deploy_mcm
+            type: task
+            template: basekit::Deploy VMs
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: bootstrap_mcm
+            type: task
+            template: basekit::Bootstrap Nodes
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: deploy_osms
+            type: task
+            template: basekit::Deploy VMs
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: bootstrap_osms
+            type: task
+            template: basekit::Bootstrap Nodes
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: bootstrap_osdc
+            type: task
+            template: basekit::Bootstrap Nodes
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          # ------------------------------------------------------------
+          # Onboarder Start
+          # ------------------------------------------------------------
+          - id: generate_ssh_key
+            type: task
+            template: onboarder::Generate SSH Key
+
+          - id: prep_onboarder_mcm
+            type: task
+            template: onboarder::Node Prep
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: push_onboarder_ssh_key_mcm
+            type: task
+            template: onboarder::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - mcm
+
+          - id: start_onboarder
+            type: task
+            template: onboarder::Start Onboarder
+
+          - id: run_onboarder_deploy
+            type: approval
+            approval_message: Run "deploy" in Onboarder, then approve to continue.
+
+          - id: update_gitea_osdc_cluster
+            type: approval
+            approval_message: Add the OSDC cluster name to the file in Gitea, then approve to continue.
+
+          - id: create_ssh_secret
+            type: task
+            template: onboarder::Create SSH Secret
+
+          # ------------------------------------------------------------
+          # OSMS
+          # ------------------------------------------------------------
+          - id: prep_onboarder_osms
+            type: task
+            template: onboarder::Node Prep
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: set_cacerts_osms
+            type: task
+            template: onboarder::Set CA Certs
+
+          - id: push_onboarder_ssh_key_osms
+            type: task
+            template: onboarder::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - osms
+
+          - id: deploy_osms_cluster
+            type: task
+            template: onboarder::Deploy OpenSpace Cluster
+            task_params:
+              arguments: '["-e", "openspace-osms"]'
+
+          - id: approve_osms_cluster
+            type: approval
+            approval_message: Did the cluster deploy successfully?
+
+          - id: approve_osms_argocd
+            type: approval
+            approval_message: Did Argo CD deploy apps successfully?
+
+          # ------------------------------------------------------------
+          # OSDC
+          # ------------------------------------------------------------
+          - id: prep_onboarder_osdc
+            type: task
+            template: onboarder::Node Prep
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          - id: set_cacerts_osdc
+            type: task
+            template: onboarder::Set CA Certs
+
+          - id: push_onboarder_ssh_key_osdc
+            type: task
+            template: onboarder::Push SSH Key
+            task_params:
+              params:
+                limit:
+                  - osdc
+
+          - id: deploy_osdc_cluster
+            type: task
+            template: onboarder::Deploy OpenSpace Cluster
+            task_params:
+              arguments: '["-e", "openspace-osdc"]'
+
+          - id: approve_osdc_cluster
+            type: approval
+            approval_message: Did the cluster deploy successfully?
+
+          - id: approve_osdc_argocd
+            type: approval
+            approval_message: Did Argo CD deploy apps successfully?
+
+          - id: post_osdc
+            type: task
+            template: onboarder::Post OSDC
+
+        edges:
+          # AFCGI Ground Infrastructure
+          - {from: mgmt_kvm_networking, to: stage_repositories, condition: on_success}
+          - {from: stage_repositories, to: bootstrap_mgmt_kvm, condition: on_success}
+          - {from: bootstrap_mgmt_kvm, to: prepare_opnsense, condition: on_success}
+          - {from: prepare_opnsense, to: change_opnsense_settings, condition: on_success}
+          - {from: change_opnsense_settings, to: deploy_opnsense, condition: on_success}
+          - {from: deploy_opnsense, to: stage_rhel_image, condition: on_success}
+          - {from: stage_rhel_image, to: deploy_mcm, condition: on_success}
+          - {from: deploy_mcm, to: bootstrap_mcm, condition: on_success}
+          - {from: bootstrap_mcm, to: deploy_osms, condition: on_success}
+          - {from: deploy_osms, to: bootstrap_osms, condition: on_success}
+          - {from: bootstrap_osms, to: bootstrap_osdc, condition: on_success}
+
+          # Onboarder Start / operator handoff
+          - {from: bootstrap_osdc, to: generate_ssh_key, condition: on_success}
+          - {from: generate_ssh_key, to: prep_onboarder_mcm, condition: on_success}
+          - {from: prep_onboarder_mcm, to: push_onboarder_ssh_key_mcm, condition: on_success}
+          - {from: push_onboarder_ssh_key_mcm, to: start_onboarder, condition: on_success}
+          - {from: start_onboarder, to: run_onboarder_deploy, condition: on_success}
+          - {from: run_onboarder_deploy, to: update_gitea_osdc_cluster, condition: on_success}
+          - {from: update_gitea_osdc_cluster, to: create_ssh_secret, condition: on_success}
+
+          # OSMS
+          - {from: create_ssh_secret, to: prep_onboarder_osms, condition: on_success}
+          - {from: prep_onboarder_osms, to: set_cacerts_osms, condition: on_success}
+          - {from: set_cacerts_osms, to: push_onboarder_ssh_key_osms, condition: on_success}
+          - {from: push_onboarder_ssh_key_osms, to: deploy_osms_cluster, condition: on_success}
+          - {from: deploy_osms_cluster, to: approve_osms_cluster, condition: on_success}
+          - {from: approve_osms_cluster, to: approve_osms_argocd, condition: on_success}
+
+          # OSDC
+          - {from: approve_osms_argocd, to: prep_onboarder_osdc, condition: on_success}
+          - {from: prep_onboarder_osdc, to: set_cacerts_osdc, condition: on_success}
+          - {from: set_cacerts_osdc, to: push_onboarder_ssh_key_osdc, condition: on_success}
+          - {from: push_onboarder_ssh_key_osdc, to: deploy_osdc_cluster, condition: on_success}
+          - {from: deploy_osdc_cluster, to: approve_osdc_cluster, condition: on_success}
+          - {from: approve_osdc_cluster, to: approve_osdc_argocd, condition: on_success}
+          - {from: approve_osdc_argocd, to: post_osdc, condition: on_success}
+
   cloud:
     views:
       - name: "{system}"
 
-# Per-system additions belong here only when one site differs from the shared
-# ground/cloud profile.
 systems: {}

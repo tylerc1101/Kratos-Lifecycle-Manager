@@ -22,14 +22,18 @@ templates:
     view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/node-prep.yml
-    allow_override_args_in_task: true
+    task_params:
+      allow_override_limit: true
+      limit: []
 
   - name: Push SSH Key
     description: Push the Onboarder SSH key to selected nodes.
     view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/push-ssh-key.yml
-    allow_override_args_in_task: true
+    task_params:
+      allow_override_limit: true
+      limit: []
 
   - name: Start Onboarder
     description: Prepare and start the Onboarder deployment environment/container.
@@ -37,18 +41,38 @@ templates:
     repository: Onboarder
     playbook: playbooks/start-onboarder.yml
 
+  - name: Create SSH Secret
+    description: Create the Rancher SSH secret used by OSMS and OSDC clusters.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/create-ssh-secret.yml
+
+  - name: Set CA Certs
+    description: Install the MCM CA certificates on OpenSpace cluster nodes.
+    view: Onboarder Tools
+    repository: Onboarder
+    playbook: playbooks/set-cacerts.yml
+
+  - name: Deploy OpenSpace Cluster
+    description: Deploy an OpenSpace cluster using workflow-supplied arguments.
+    view: Onboarder Tools
+    repository: Onboarder
+    app: bash
+    playbook: scripts/deploy-openspace-cluster.sh
+    allow_override_args_in_task: true
+
   - name: Post OSDC
     description: Perform post-deployment OSDC configuration.
     view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/post_osdc.yml
 
-# These workflows make the major Onboarder phases runnable independently.
-# The same task templates can also be referenced by an AFCGI end-to-end
-# workflow later without duplicating the actual automation.
 workflows:
-  - name: Onboarder Deployment
-    description: Deploy Onboarder and the management-cluster platform services.
+  # Semaphore cannot nest workflows. Each larger workflow below therefore
+  # references the same task templates directly in the requested order.
+
+  - name: Onboarder Start
+    description: Prepare MCM and start the Onboarder deployment environment.
     view: Onboarder Tools
 
     nodes:
@@ -80,3 +104,234 @@ workflows:
       - {from: generate_ssh_key, to: prep_mcm, condition: on_success}
       - {from: prep_mcm, to: push_ssh_key_mcm, condition: on_success}
       - {from: push_ssh_key_mcm, to: start_onboarder, condition: on_success}
+
+  - name: Onboarder Deploy OSMS
+    description: Prepare and deploy the OSMS OpenSpace cluster with approval gates.
+    view: Onboarder Tools
+
+    nodes:
+      - id: prep_osms
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: set_cacerts_osms
+        type: task
+        template: Set CA Certs
+
+      - id: push_ssh_key_osms
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: deploy_osms_cluster
+        type: task
+        template: Deploy OpenSpace Cluster
+        task_params:
+          arguments: '["-e", "openspace-osms"]'
+
+      - id: approve_osms_cluster
+        type: approval
+        approval_message: Did the cluster deploy successfully?
+
+      - id: approve_osms_argocd
+        type: approval
+        approval_message: Did Argo CD deploy apps successfully?
+
+    edges:
+      - {from: prep_osms, to: set_cacerts_osms, condition: on_success}
+      - {from: set_cacerts_osms, to: push_ssh_key_osms, condition: on_success}
+      - {from: push_ssh_key_osms, to: deploy_osms_cluster, condition: on_success}
+      - {from: deploy_osms_cluster, to: approve_osms_cluster, condition: on_success}
+      - {from: approve_osms_cluster, to: approve_osms_argocd, condition: on_success}
+
+  - name: Onboarder Deploy OSDC
+    description: Prepare and deploy the OSDC OpenSpace cluster with approval gates and post-deployment configuration.
+    view: Onboarder Tools
+
+    nodes:
+      - id: prep_osdc
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - osdc
+
+      - id: set_cacerts_osdc
+        type: task
+        template: Set CA Certs
+
+      - id: push_ssh_key_osdc
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - osdc
+
+      - id: deploy_osdc_cluster
+        type: task
+        template: Deploy OpenSpace Cluster
+        task_params:
+          arguments: '["-e", "openspace-osdc"]'
+
+      - id: approve_osdc_cluster
+        type: approval
+        approval_message: Did the cluster deploy successfully?
+
+      - id: approve_osdc_argocd
+        type: approval
+        approval_message: Did Argo CD deploy apps successfully?
+
+      - id: post_osdc
+        type: task
+        template: Post OSDC
+
+    edges:
+      - {from: prep_osdc, to: set_cacerts_osdc, condition: on_success}
+      - {from: set_cacerts_osdc, to: push_ssh_key_osdc, condition: on_success}
+      - {from: push_ssh_key_osdc, to: deploy_osdc_cluster, condition: on_success}
+      - {from: deploy_osdc_cluster, to: approve_osdc_cluster, condition: on_success}
+      - {from: approve_osdc_cluster, to: approve_osdc_argocd, condition: on_success}
+      - {from: approve_osdc_argocd, to: post_osdc, condition: on_success}
+
+  - name: Onboarder Deployment Full
+    description: Run the complete Onboarder start, operator handoff, OSMS deployment, and OSDC deployment sequence.
+    view: Onboarder Tools
+
+    nodes:
+      - id: generate_ssh_key
+        type: task
+        template: Generate SSH Key
+
+      - id: prep_mcm
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - mcm
+
+      - id: push_ssh_key_mcm
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - mcm
+
+      - id: start_onboarder
+        type: task
+        template: Start Onboarder
+
+      - id: run_onboarder_deploy
+        type: approval
+        approval_message: Run "deploy" in Onboarder, then approve to continue.
+
+      - id: update_gitea_osdc_cluster
+        type: approval
+        approval_message: Add the OSDC cluster name to the file in Gitea, then approve to continue.
+
+      - id: create_ssh_secret
+        type: task
+        template: Create SSH Secret
+
+      - id: prep_osms
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: set_cacerts_osms
+        type: task
+        template: Set CA Certs
+
+      - id: push_ssh_key_osms
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: deploy_osms_cluster
+        type: task
+        template: Deploy OpenSpace Cluster
+        task_params:
+          arguments: '["-e", "openspace-osms"]'
+
+      - id: approve_osms_cluster
+        type: approval
+        approval_message: Did the cluster deploy successfully?
+
+      - id: approve_osms_argocd
+        type: approval
+        approval_message: Did Argo CD deploy apps successfully?
+
+      - id: prep_osdc
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - osdc
+
+      - id: set_cacerts_osdc
+        type: task
+        template: Set CA Certs
+
+      - id: push_ssh_key_osdc
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - osdc
+
+      - id: deploy_osdc_cluster
+        type: task
+        template: Deploy OpenSpace Cluster
+        task_params:
+          arguments: '["-e", "openspace-osdc"]'
+
+      - id: approve_osdc_cluster
+        type: approval
+        approval_message: Did the cluster deploy successfully?
+
+      - id: approve_osdc_argocd
+        type: approval
+        approval_message: Did Argo CD deploy apps successfully?
+
+      - id: post_osdc
+        type: task
+        template: Post OSDC
+
+    edges:
+      - {from: generate_ssh_key, to: prep_mcm, condition: on_success}
+      - {from: prep_mcm, to: push_ssh_key_mcm, condition: on_success}
+      - {from: push_ssh_key_mcm, to: start_onboarder, condition: on_success}
+      - {from: start_onboarder, to: run_onboarder_deploy, condition: on_success}
+      - {from: run_onboarder_deploy, to: update_gitea_osdc_cluster, condition: on_success}
+      - {from: update_gitea_osdc_cluster, to: create_ssh_secret, condition: on_success}
+      - {from: create_ssh_secret, to: prep_osms, condition: on_success}
+      - {from: prep_osms, to: set_cacerts_osms, condition: on_success}
+      - {from: set_cacerts_osms, to: push_ssh_key_osms, condition: on_success}
+      - {from: push_ssh_key_osms, to: deploy_osms_cluster, condition: on_success}
+      - {from: deploy_osms_cluster, to: approve_osms_cluster, condition: on_success}
+      - {from: approve_osms_cluster, to: approve_osms_argocd, condition: on_success}
+      - {from: approve_osms_argocd, to: prep_osdc, condition: on_success}
+      - {from: prep_osdc, to: set_cacerts_osdc, condition: on_success}
+      - {from: set_cacerts_osdc, to: push_ssh_key_osdc, condition: on_success}
+      - {from: push_ssh_key_osdc, to: deploy_osdc_cluster, condition: on_success}
+      - {from: deploy_osdc_cluster, to: approve_osdc_cluster, condition: on_success}
+      - {from: approve_osdc_cluster, to: approve_osdc_argocd, condition: on_success}
+      - {from: approve_osdc_argocd, to: post_osdc, condition: on_success}

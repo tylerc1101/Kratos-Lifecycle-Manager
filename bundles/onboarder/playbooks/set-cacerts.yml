@@ -1,0 +1,28 @@
+---
+- name: Install MCM CA certificates on OSMS and OSDC nodes
+  hosts: osms:osdc
+  become: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Read CA certificates from KLM host
+      ansible.builtin.slurp:
+        src: "{{ klm_home }}/state/onboarder/.cache/cacerts.pem"
+      delegate_to: "{{ groups['klm_host'][0] }}"
+      run_once: true
+      register: cacerts_pem
+      become: true
+
+  tasks:
+    - name: Install MCM CA certificates
+      ansible.builtin.copy:
+        content: "{{ cacerts_pem.content | b64decode }}"
+        dest: /etc/pki/ca-trust/source/anchors/cacerts.pem
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Update system CA trust
+      ansible.builtin.command:
+        cmd: update-ca-trust extract
+      changed_when: false

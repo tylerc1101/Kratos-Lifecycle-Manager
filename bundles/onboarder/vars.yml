@@ -5,4 +5,5 @@ bundle_vars:
   rke2_api_vip: "192.168.2.253"
   wildcard_ingress_vip: "192.168.2.254"
   nic_interface: "enp1s0"
+  osdc_nic_interface: "ens2f0np0"
   vip_address: "192.168.2.250"

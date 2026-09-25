@@ -1,7 +1,7 @@
 {
   "CustomParameters": {
     "istioTrustDomain": "cluster.local",
-    "kubevipInterface": "{{ bundle.nic_interface }}",
+    "kubevipInterface": "{{ bundle.osdc_nic_interface }}",
     "mtlsPeerAuthEnable": true,
     "selinux": true,
     "singleNode": false
@@ -20,14 +20,14 @@
       "MachineIP": "192.168.2.16",
       "MachineName": "osdc1",
       "RegistrationCommand": " ",
-      "SSHSecretName": "osdc-ssh",
+      "SSHSecretName": "rancher-ssh",
       "SSHSecretUsername": "{{ openspace_user }}"
     },
     {
       "MachineIP": "192.168.2.17",
       "MachineName": "osdc2",
       "RegistrationCommand": " ",
-      "SSHSecretName": "osdc-ssh",
+      "SSHSecretName": "rancher-ssh",
       "SSHSecretUsername": "{{ openspace_user }}"
     }
   ],

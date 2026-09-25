@@ -1,0 +1,231 @@
+{
+  "version": "1.0.0",
+  "customerName": "Kratos",
+  "customerId": "636a4a9b-a420-4498-8fd3-5ec1e0ddcf03",
+  "entitlementId": "",
+  "certificateId": "",
+  "hostId": "",
+  "issuerName": "Paul.Ankiewicz",
+  "issuerId": "962e4f71-a5d6-4a34-943d-f50d2ffe6356",
+  "licenseeName": "365day-OpenSpaceLicense",
+  "licenseeId": "0f455148-50fe-4d9c-a71e-2b200ed99e2f",
+  "creationDate": "2026-01-27T00:00Z",
+  "features": [
+    {
+      "name": "OpsCenter",
+      "id": "7181fa3e-41e2-4753-95a8-aa446148c058",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "BFPykrltQMG+lRhlf4CmYJ3ZzPu3bDbnthlq5n7UvnxbqUjDEzedEEBLh3CHcUoiWwXen/5XMHJyrQ6xb9nOzvbN7t8c62e+14bwswpikfu9CDC9DRShdmvvHM4hWQpMxh84VoCsXKhmXYSE/BQibjCEmuMPLW2iwGfka2F1hSk\u003d"
+    },
+    {
+      "name": "OpsCenter-OpenSpace",
+      "id": "a1c72eb2-4971-472c-b216-8915cdaf1650",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "JTplhNpKuR63f8uADX73SyEjkAhL7mBRxjzv+S+QKeyFkeuxjSR3uAhByKcGbJC7VrlsgHRHPflPabRoCc/t7YVTn1kpi5ywyPmDoqsBshd86jOSfs4adnjYVKY+wVtMqMCpDmG2UlXkgGx9mltiQDsYNfbEbur0x9MyMuiHW1k\u003d"
+    },
+    {
+      "name": "OpsCenter-ServiceChain-Sandbox",
+      "id": "ce20e8a7-fef4-4007-bc3e-616a2272187d",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "VxWtsxBaXIYAuDEnUT+9zKbviGqkKvV6WDpjzYRzQfumRtInjMil7OISDFaSoMb+zlVeN0pdpL974uT1BtDhMov27MKi3RpLYuOuOBCCaogW5Sqh3OFxKOm4O65bsnbVfdq/83ycN1tljB/90fBsDQXIXQ4VVAMFff7AWmIomuY\u003d"
+    },
+    {
+      "name": "OpsCenter-ServiceChain-Production",
+      "id": "b6a46cd9-c55f-4213-a456-a6a10476a260",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "VZOxvgGKF1whq9MEmO1h7pCEFtlPBA3Fmk3UDFhYiCkIElHB/24UIJOGO+wBdT0BCJXABaSwu4Q1Qj7y3yvqve8Q6mXYdYVrSsIy1e3Y6+jtGSKv2dq8NLWkXJ2LVx3phgGR9vd6KCzznBW6vV2aVwVWhv5v6zJb2EpjncCSFhQ\u003d"
+    },
+    {
+      "name": "OpsCenter-Satellite-Contact-Scheduler",
+      "id": "09956e8c-48b6-488b-8cc2-91df5d012294",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "cBu+9/QhV/+7DwK0dF/ryxins5LWgRXr7G7+suG29kUob3Tby5TNtfxcR4wfg0T2/nolUZLZyC+JCQwVpmxRemyaOlXHiazKqqODPajhQwbNJUkJ4KWDyp+BJTV8aIxaR9pbbLlA98wxX7y2JQVle741+089cJt/KRVMcOG3Dc4\u003d"
+    },
+    {
+      "name": "OpsCenter-DDX",
+      "id": "4d63703a-4eb3-428a-9862-c5a89def5f0e",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "IAM7faiIDg2uCRdmscdRUeThvu2LyGh1iYm4jVyIkXcKMUCKjaiRE6frZTzd8H3X/+HwYaU889wUTRcgmEBYJ7ZsSnbMvLZ/2hFiagLCVQoITU0Rke5SqTgPUmfhFCX1BuI2j5rSduLulFSsjxc2gL+QU1Bb4eB4BMKdNagoVB0\u003d"
+    },
+    {
+      "name": "OpsCenter-Networking",
+      "id": "02b1f853-bf5f-4ce1-b2b5-4a205587100a",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "CzjFzpALfiPyQPpBEJtxCOhRjCbgja7HIdgjbHUetMnO0cYJ75lHt56uMesqWZrQ38lcV6X98OYCD0EKb4i99JM8hHlL5wI2sf7isJ0LKqzCsYV7EjGtw65SCCLEN3kN40pIyzHUjg9peuCwF3Cl/AwzHMS9mB9Wo3cGhXgcHng\u003d"
+    },
+    {
+      "name": "VNF-OCB",
+      "id": "c36bb52e-4ae6-431f-95df-37e9bcf3f5bf",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "oFqPMIaNHnWUhmrifoATqmUykdweR1NkH44fTwkOn/Fp5/NxUABcjyot2GuqqFlg1LQ14tHRXwIgG04Br6kGDRfttgzQd90lJToV3RicqieTle1KRVMEj+LoSTx+GwGto4yW+NEeSqGNIxXgNjyGi5X9LtR+FfC2c5VLbPr5SUo\u003d"
+    },
+    {
+      "name": "VNF-OCH",
+      "id": "0070e534-5f8d-491f-8aea-2e07baecae5e",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "mihwlJqoN3bPMwOC3RJaE2FzcTDpL8FMKI/QFr4AoOjveSSfh1T/tpVa1eS5Yw7QSf7xQvtphQbpGEnOADLLc2dgr0j1hkuYjTcj4ka5TwMm8WQFfarMQpTjGHsvENxSMK+ncxUv6o8PbEyhdlQJakFHeo4ay4z4CCtCECpv0uk\u003d"
+    },
+    {
+      "name": "VNF-OSPR",
+      "id": "7c24e8f1-5041-4ec3-94ed-38a93eb6bc4e",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "naaVZhysbIqasFEFkOZHN5mAsUAoDkY1aLTvbWSHl40s6JmKN5WlPVL2gjTbCcrGug7SyQFHzFt9cqKNy0YD/vMPYF/Vl9MyDjdDe6sx/l/oBd2lqKlHKN0Wap154/QM+SEBz5BXjjhXPruTbi7DrfFg0Uyyp7vubKXGpl1yyIc\u003d"
+    },
+    {
+      "name": "VNF-OWTP",
+      "id": "8417d497-4735-4e70-b42b-2bfff95928ab",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "QwtAWzxKS4IQ71evLbEdNF30t2s98s2m0wIvG0XpfpXk8ktnOoNFzSF9Cw6JmL3aD4XQxYo0d8UGRe7R4L8lKayqv+YgqrP7q1DpmUTjzuBhYc3kuOYfJSUN+8Bv7CCplxklosdlDT6nw4TTseO+aB0jR8Xdbt8JFS5gHQ69oNI\u003d"
+    },
+    {
+      "name": "VNF-wOTX",
+      "id": "6398584d-2175-48e4-b3b8-75a229674b0f",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "ZPI3BnUpphK7SQvEr566kbDQ74GLLmhOSA9BompsCy12aOAf99jGlCKR2S2LqJte8ajua3Bodct4XlAd1cW1xJcVOxlIbP8S+YbUgjHIUykHcEZJ44qRsEpZRbOSIhsKNS5AHMwTY95G37HC1rxDF8tI0Ey1DYndVM/E/hma2KU\u003d"
+    },
+    {
+      "name": "VNF-wORX",
+      "id": "0bc9b436-f3e5-473e-82b1-869a5fb11798",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "JFmKLzAQ2qQFTXfL2HCCAUGmxL5IWK1TNNOdyaCt0N47irO9RtX5KmvAWUgXrmGMtyXFnE0+81g/Dkf4eX4IuCF9exQOjlOMtGTZ3/NtOvXGW5gTLMHVzFXl8EewY3URcpiN/Jm5ob9IYR2LGgwQO3FiHTCZP+gYMylNT+Ke5j0\u003d"
+    },
+    {
+      "name": "VNF-ORA",
+      "id": "e5008cd5-5ecf-4518-b824-849ce98154a8",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "lCAr89iiXHmTgGdI/kWErty9lmpaCpszZXxDb3E+AbKzv3T1zrAvcSwNQbYPWKVM7Fqelnoa+OrVjwxM+bhJjGbp6GUxxiUGV3cnDKh2+wtDZECtXUL25L/Ueb3MehB81OMlwKKASZiRDDih/C7UE938SiyoLK79HDKcEtjMt2Q\u003d"
+    },
+    {
+      "name": "VNF-GSE",
+      "id": "98b17197-5b5b-4a24-80b8-f03bc8c214a7",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "Cbmdx/UmVhel/df5neYvL8fRiAuAm6B+nxalkAAvrIZB9on3axQWSj4i6gYn/9tk2AxiFhQ23oS8jnYfdzDQTN4I37f/FIx8qWoJVyF4OBcU59cxCvsXTko7W154s9elVYpZF3yk68Ja68tgcrDc609tax7t/yE1i3Rfp/ax7hk\u003d"
+    },
+    {
+      "name": "VNF-VTX",
+      "id": "d153251a-e75b-4a34-9b61-04ef7a4d6b72",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "DElqxWSCcZkKAv2CkcZTWHWfZWhb1YSe81hYMM0G6G6LyIG3E96G4dphT4aCBPHNdnqnzWJCo3P9p5bpPj5x8Gz5raXL3eiJ52RMerIfJa905Ux1zBFTu75s9SNTXY4/opPEgeBCnq+Ds7ahcCbqHyPxOuHBPwv7vsUdABaSqr0\u003d"
+    },
+    {
+      "name": "VNF-VRX",
+      "id": "cecfbef5-c529-4aa8-b07f-2f11ffbfdbe1",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "hZ70aPbo7dw7Hb5p/shK0V6lamcbdFFkzF9k+rsKjEHYqYMq//Qj6EE3qIPUZjUIRch6Klj9nujsQZUQDreOTHM2NH05iHNisVDvg5J5gCGRQ7sKFscXCFFhgpy7JVTKLdsYrgEa4GfpjxDdl1DNGIgby2DYeUyoOpvwl6YPG1w\u003d"
+    },
+    {
+      "name": "VNF-VTA",
+      "id": "9b5278e2-33dd-4767-bda2-4007bc4bdda2",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "PZ32fKX7yl4vLyfHLZRHDRyo4SV4Ydldsj95eSVcbbUhFghZJvWn8OTFC3CaKaRa7d1p7J01lWZLZs8EPX7AdlNQLupWiqm4BRi75brGjtILaTjxng7sgDN3Acntw4iN/viTCaeQgJLTUrxLGqQSn9G8LdTNvunw75RVPfgWiw4\u003d"
+    },
+    {
+      "name": "VNF-VTT",
+      "id": "c924d280-3900-4758-bf5b-ee92b2b47b36",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "bJkyzTmJgyFw7qEuMI38fjgMfK7pTRXnPbwSvHxC4nWhkkZmxiJTaUvEvC61aWeXywkNQOyCzE1t0Ki1jeuR3v1LBpuIAAPIbqiZlM93cM6MwFyzJnXhFc+yW/rzUPsht/qbGbC4AMAAvChr1ePJVV0ZIEEIfLJ+Yv8Oy3vZ+3E\u003d"
+    },
+    {
+      "name": "VNF-VTR",
+      "id": "2f38922d-466b-45fb-9f68-5adb4103eb50",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "E8sjcOZmEj/OK822HQkCrx3awV4QstJJ4Ql2QUgMQtXLo4tm+V6KCbKHQ8BYUBVSmyspAwlqZP2IYrciOgl99Wii5kd4ig9hM4Ui90cVTSBkcvufy2vk9wti8cGa/IYpBQhMUOUrNgq0ODHh7UL5HKkXu68ZeiL3qRDrofhARXI\u003d"
+    },
+    {
+      "name": "VNF-VZP",
+      "id": "ab18202a-d315-4598-8dcc-95c6477d1613",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "U2BOWefEhFvaT9N7i0VpV21d3erGreXzcUzpRwkumld7AwKbl0al2s+g3zBOIhMCDL+KFEh+lR76JyoMt2FkTWCso0T7fUoPdeJkX4prOIIAOL4+Wd8kwXYg5IVFz86qHEbIRi//APzJrFRWm7fRIuk0M2NFv5l5g9BHIHKSleM\u003d"
+    },
+    {
+      "name": "VNF-OTC",
+      "id": "ec0fb579-20d0-45b9-88a7-d7d75a3984d9",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "QNAPaczXlQDjmpf+gzqN0ah3mr8kENikwE0U33NsjCtKsJHxF55d//e2Evg8Bj9kMBgCG2LSIiK1yr/nKJQzlHR8OvSEoI2jjZO3ipVvQJ7U/OxpPHdASLhpXCs6d0YHrR8nvsT+JC63MoyLIk1MF9Ex1CvGqk89YdzcwqV6Edk\u003d"
+    },
+    {
+      "name": "VNF-OSC",
+      "id": "49af61c8-89ac-49ad-a7f6-79a4906ddf57",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "omP2BULkj0EzOBFmh4EOmUw0GX3ahN6pfqEvPGZsDOo9vMwD8Sh8K3YcaqCU5d7IbnocNXzGZIDuKitvqbWZu9PMd+ISRKtznkThmCn/8NzhCK3bVsH0Z6k3mUtMkiQgeay4AWxgiQgdQyxd5EXo/0btIR5bAcP7l8o8Uqmy+fc\u003d"
+    },
+    {
+      "name": "VNF-QRADIO",
+      "id": "19d47aa4-c9f5-45d4-b173-22f7c2406ad7",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "Sz0ovuDTdkUOtu7ZfGgLIYZfkbureSRRsocjr/PfPU9BnChtz6zw5LpVZ2HU0UKvCh3DAmaBQKh0jTYiD33BRc5fu7XLSv4Aw7HB5LYV79sRv6csvq7BK/TB9uSTgrLBySLMXiXUtTzWsWa31+5DsXtFf6C1h/0J9NS7JpGkevA\u003d"
+    },
+    {
+      "name": "VNF-QFEP",
+      "id": "7ec1fe89-b430-4fcc-a56f-79949addf144",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "mw4wHuxbswKL5tpn6GCIZTJB1SSTMuLfmXnOsyOS/+cxfd/k4yS78rpr/WeWMXMrq5ZGVXCK1KEko066YR5cFrU2lbcd7O68oKOoW6OR7o6l3mvOpxzbRgyNpv3qMxhuAWP9Qf5gsVaPCGwHSD0TxyXvKTa/9PhuKK2zaC948FM\u003d"
+    },
+    {
+      "name": "VNF-vRecorder",
+      "id": "e8334a6b-c57b-4f87-8bbb-71ad37dabb89",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "DYkve30h+VYds9p93RFsGRrlfrduTMoFgkEeTsV75PVKr1DAZ+ZGJhZMjtOiO6o5PtoOxpg/pv5y3CSTXyx5xP40UWnWlnei03R9YM5qfLeC9kgE6YPOLGLHr24hqT/ERHVxv18e3qao0bGfHEkPaugDLUIGtlUTB+0P+fahB24\u003d"
+    },
+    {
+      "name": "VNF-HiSkyHubPP",
+      "id": "019532a7-1906-4f48-b5d1-4e81a978f3e0",
+      "instances": "unlimited",
+      "type": "expiration",
+      "expiration": "2027-01-27T00:00Z",
+      "licenseKey": "lHSXmFSHw4CaBhIttZYABG18/MuwAI4DmVM27qe/DCHeKwFRmcYlQ+DeyQ3aJEylx+AQqdT78Q6eNQfBqQosiectwf4c2byc0XiMswWxIIMtNEKMMEmcx/TEp5CRtminiFMOH6Ku29ZwXrghQImEFsuwNEep/FEbg9I3AH1grqk\u003d"
+    }
+  ]
+}

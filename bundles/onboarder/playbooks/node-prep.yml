@@ -3,6 +3,7 @@
   hosts: mcm:osms:osdc
   become: true
   gather_facts: false
+
   pre_tasks:
     - name: Load bundle variables
       ansible.builtin.include_vars:
@@ -26,16 +27,18 @@
 
     - name: Copy RKE2 SELinux RPM to /tmp
       ansible.builtin.copy:
-        src: "../images/{{ bundle['rke2-selinux-rpm'] }}"
-        dest: "/tmp/{{ bundle['rke2-selinux-rpm'] }}"
+        src: "../images/{{ bundle['rke2_selinux_rpm'] }}"
+        dest: "/tmp/{{ bundle['rke2_selinux_rpm'] }}"
         remote_src: false
         owner: root
         group: root
         mode: "0644"
-    
+
     - name: Install RKE2 SELinux policy
-      ansible.builtin.command:
-        cmd: "rpm -i /tmp/{{ bundle['rke2-selinux-rpm'] }}"
+      ansible.builtin.dnf:
+        name: "/tmp/{{ bundle['rke2_selinux_rpm'] }}"
+        state: present
+        disable_gpg_check: true
 
     - name: Install required Kubernetes packages
       ansible.builtin.dnf:
@@ -70,7 +73,7 @@
 
     - name: Configure OpenSpace passwordless sudo
       ansible.builtin.copy:
-        dest: /etc/sudoers.d/90-openspace-users
+        dest: /etc/sudoers.d/{{ openspace_user }}
         content: |
           {{ openspace_user }} ALL=(ALL) NOPASSWD:ALL
         owner: root
@@ -111,7 +114,12 @@
           net.ipv4.tcp_mem=67108864 67108864 67108864
           net.ipv4.udp_mem=16777216 16777216 16777216
           net.ipv4.ip_forward=1
-      notify: Apply sysctl settings
+      register: sysctl_config
+
+    - name: Apply sysctl settings
+      ansible.builtin.command:
+        cmd: sysctl --system
+      when: sysctl_config.changed
 
     - name: Configure required kernel modules
       ansible.builtin.copy:
@@ -157,6 +165,13 @@
         enabled: false
       failed_when: false
 
+    - name: Disable fapolicyd
+      ansible.builtin.systemd_service:
+        name: fapolicyd
+        state: stopped
+        enabled: false
+      failed_when: false
+
     - name: Disable and mask irqbalance
       ansible.builtin.systemd_service:
         name: irqbalance
@@ -182,6 +197,11 @@
         state: started
         enabled: true
 
+    - name: Ensure SSH daemon is enabled and running
+      ansible.builtin.systemd_service:
+        name: sshd
+        state: started
+        enabled: true
 
     # ------------------------------------------------------------------
     # OSDC-only configuration
@@ -236,14 +256,19 @@
             path: /etc/default/grub
             regexp: '^(GRUB_CMDLINE_LINUX=")(?![^"]*intel_idle\.max_cstate=0)'
             replace: '\1intel_idle.max_cstate=0 '
-          notify: Regenerate grub configuration
+          register: intel_idle_grub
 
         - name: Add processor C-state kernel parameter
           ansible.builtin.replace:
             path: /etc/default/grub
             regexp: '^(GRUB_CMDLINE_LINUX=")(?![^"]*processor\.max_cstate=1)'
             replace: '\1processor.max_cstate=1 '
-          notify: Regenerate grub configuration
+          register: processor_cstate_grub
+
+        - name: Regenerate grub configuration
+          ansible.builtin.command:
+            cmd: grub2-mkconfig --update-bls-cmdline -o /boot/grub2/grub.cfg
+          when: intel_idle_grub.changed or processor_cstate_grub.changed
 
         - name: Install RX ring adjustment script
           ansible.builtin.copy:
@@ -289,9 +314,17 @@
 
               SUBSYSTEM=="net", ACTION=="add|move|change", DRIVERS=="i40e", RUN+="/usr/sbin/ip link set %k qlen 100000"
               SUBSYSTEM=="net", ACTION=="add|move|change", DRIVERS=="i40e", RUN+="/usr/local/bin/adjust_rx_ring.sh %k"
-          notify:
-            - Reload udev rules
-            - Trigger udev rules
+          register: osdc_udev_rules
+
+        - name: Reload udev rules
+          ansible.builtin.command:
+            cmd: udevadm control --reload
+          when: osdc_udev_rules.changed
+
+        - name: Trigger udev rules
+          ansible.builtin.command:
+            cmd: udevadm trigger
+          when: osdc_udev_rules.changed
 
         - name: Create RKE2 server systemd override directory
           ansible.builtin.file:
@@ -320,7 +353,7 @@
               LimitRTPRIO=infinity
               LimitNOFILE=infinity
               ExecStartPre=-/bin/sh -c 'rm -f /var/lib/kubelet/cpu_manager_state /var/lib/kubelet/memory_manager_state'
-          notify: Reload systemd
+          register: rke2_server_override
 
         - name: Configure RKE2 agent realtime limits
           ansible.builtin.copy:
@@ -333,33 +366,16 @@
               LimitRTPRIO=infinity
               LimitNOFILE=infinity
               ExecStartPre=-/bin/sh -c 'rm -f /var/lib/kubelet/cpu_manager_state /var/lib/kubelet/memory_manager_state'
-          notify: Reload systemd
+          register: rke2_agent_override
 
-        - name: Apply configuration handlers before reboot
-          ansible.builtin.meta: flush_handlers
+        - name: Reload systemd
+          ansible.builtin.systemd_service:
+            daemon_reload: true
+          when: rke2_server_override.changed or rke2_agent_override.changed
 
-        - name: Reboot OSDC node
+        - name: Reboot OSDC node when kernel parameters changed
           ansible.builtin.reboot:
             reboot_timeout: 900
-
-
-  handlers:
-    - name: Apply sysctl settings
-      ansible.builtin.command:
-        cmd: sysctl --system
-
-    - name: Regenerate grub configuration
-      ansible.builtin.command:
-        cmd: grub2-mkconfig --update-bls-cmdline -o /boot/grub2/grub.cfg
-
-    - name: Reload udev rules
-      ansible.builtin.command:
-        cmd: udevadm control --reload
-
-    - name: Trigger udev rules
-      ansible.builtin.command:
-        cmd: udevadm trigger
-
-    - name: Reload systemd
-      ansible.builtin.systemd_service:
-        daemon_reload: true
+            connect_timeout: 10
+            post_reboot_delay: 15
+          when: intel_idle_grub.changed or processor_cstate_grub.changed

@@ -40,18 +40,22 @@ templates:
     view: BaseKit
     repository: BaseKit
     playbook: playbooks/deploy-vms.yml
-    allow_override_args_in_task: true
+    task_params:
+      allow_override_limit: true
+      limit: []
 
   - name: Bootstrap Nodes
     description: Configure selected nodes with NTP, repositories, hostname, and baseline settings.
     view: BaseKit
     repository: BaseKit
     playbook: playbooks/bootstrap-nodes.yml
-    allow_override_args_in_task: true
+    task_params:
+      allow_override_limit: true
+      limit: []
 
 workflows:
-  - name: Infrastructure Install
-    description: Reusable BaseKit infrastructure installation without environment-specific AFCGI tasks.
+  - name: BaseKit - Infrastructure Install
+    description: Reusable BaseKit infrastructure installation without AFCGI-specific tasks.
     view: BaseKit
 
     nodes:

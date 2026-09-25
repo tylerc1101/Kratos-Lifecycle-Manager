@@ -49,6 +49,9 @@
         - src: "../templates/{{ reference_arch }}/openspace-osms.json.j2"
           dest: openspace-osms.json
 
+        - src: "../templates/{{ reference_arch }}/vm.json.j2"
+          dest: .cache/vm.json
+
     - name: Copy onboarder files
       ansible.builtin.copy:
         src: "{{ item.src }}"
@@ -65,14 +68,6 @@
           dest: secrets.yaml
           mode: "0600"
 
-    - name: Copy VM configuration into onboarder cache
-      ansible.builtin.copy:
-        src: ../templates/{{ reference_arch }}/vm.json.j2
-        dest: "{{ klm_home }}/state/onboarder/.cache/vm.json"
-        owner: kratos
-        group: kratos
-        mode: "0644"
-
     - name: Copy SSH key into onboarder cache
       ansible.builtin.copy:
         src: "{{ klm_home }}/.ssh/{{ ssh_key }}"
@@ -83,14 +78,11 @@
         mode: "0600"
 
     - name: Load onboarder container image
-      ansible.builtin.command:
-        cmd: >-
-          podman load
-          -i {{ klm_home }}/bundles/onboarder/images/{{ bundle.onboarder_image }}
+      containers.podman.podman_load:
+        input: "{{ klm_home }}/bundles/onboarder/images/{{ bundle.onboarder_image }}"
       environment:
         TMPDIR: /var/opt
       register: onboarder_image_load
-      changed_when: "'Loaded image' in onboarder_image_load.stdout"
 
     - name: Show loaded onboarder image
       ansible.builtin.debug:
@@ -106,13 +98,17 @@
           }}
 
     - name: Run onboarder container
-      ansible.builtin.command:
-        cmd: >-
-          podman run
-          --rm
-          --name klm-onboarder
-          --volume {{ klm_home }}/state/onboarder:/docker-workspace/config/{{ env_name }}:Z
-          {{ onboarder_image_ref }}
+      containers.podman.podman_container:
+        name: onboarder
+        image: "{{ onboarder_image_ref }}"
+        state: started
+        detach: true
+        interactive: true
+        tty: true
+        command:
+          - /bin/bash
+        volume:
+          - "{{ klm_home }}/state/onboarder:/docker-workspace/config/{{ env_name }}:Z"
       environment:
         TMPDIR: /var/opt
 
@@ -161,22 +157,6 @@
         - deploy-rancher
         - deploy-gitea
         - deploy-argocd
-
-
-    - name: Set KLM script permissions inside container
-      ansible.builtin.command:
-        cmd: >-
-          podman exec
-          --user root
-          klm-engine
-          chmod 0755 /usr/local/bin/{{ item }}
-      loop:
-        - deploy-kubernetes
-        - deploy-harbor
-        - deploy-rancher
-        - deploy-gitea
-        - deploy-argocd
-
 
     - name: Remove temporary KLM scripts directory
       ansible.builtin.file:

@@ -1,8 +1,319 @@
 ---
-- name: Placeholder - Onboarder post OSDC
-  hosts: all
+- name: Deploy OSDC cluster resources
+  hosts: osdc
+  become: true
   gather_facts: false
+
+  vars:
+    kubectl_path: /var/lib/rancher/rke2/bin/kubectl
+    kubeconfig_path: /etc/rancher/rke2/rke2.yaml
+
+    osdc_manifest_dir: /tmp/klm-osdc-manifests
+
   tasks:
-    - name: Replace this placeholder before use
-      ansible.builtin.fail:
-        msg: "TODO: implement Onboarder post OSDC"
+    # ------------------------------------------------------------------
+    # Prepare temporary manifest directory
+    # ------------------------------------------------------------------
+
+    - name: Create temporary OSDC manifest directory
+      ansible.builtin.file:
+        path: "{{ osdc_manifest_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # Static OSDC manifests
+    # ------------------------------------------------------------------
+
+    - name: Copy OSDC static manifests
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ osdc_manifest_dir }}/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0600"
+      loop:
+        - ../files/anti-flood-policy.yaml
+        - ../files/sriov-network-difi0.yaml
+        - ../files/sriov-network-difi2.yaml
+        - ../files/sriov-network.traffic.yaml
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # Rendered OSDC manifests
+    # ------------------------------------------------------------------
+
+    - name: Render OSDC SR-IOV node policies
+      ansible.builtin.template:
+        src: "{{ item }}"
+        dest: "{{ osdc_manifest_dir }}/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: "0600"
+      loop:
+        - ../templates/osdc-1-sriov-node.policy.yaml
+        - ../templates/osdc-2-sriov-node.policy.yaml
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # OpenSpace NF namespace
+    # ------------------------------------------------------------------
+
+    - name: Create openspace-nf namespace
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail &&
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          create namespace openspace-nf
+          --dry-run=client
+          -o yaml
+          |
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply -f -
+        executable: /bin/bash
+      register: openspace_nf_namespace
+      changed_when: >
+        'created' in openspace_nf_namespace.stdout or
+        'configured' in openspace_nf_namespace.stdout
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # Apply OSDC cluster resources
+    # ------------------------------------------------------------------
+
+    - name: Apply anti-flood policy
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply
+          -f {{ osdc_manifest_dir }}/anti-flood-policy.yaml
+      register: anti_flood_result
+      changed_when: >
+        'created' in anti_flood_result.stdout or
+        'configured' in anti_flood_result.stdout
+      run_once: true
+
+    - name: Apply DIFI0 SR-IOV network
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply
+          -f {{ osdc_manifest_dir }}/sriov-network-difi0.yaml
+      register: difi0_result
+      changed_when: >
+        'created' in difi0_result.stdout or
+        'configured' in difi0_result.stdout
+      run_once: true
+
+    - name: Apply DIFI2 SR-IOV network
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply
+          -f {{ osdc_manifest_dir }}/sriov-network-difi2.yaml
+      register: difi2_result
+      changed_when: >
+        'created' in difi2_result.stdout or
+        'configured' in difi2_result.stdout
+      run_once: true
+
+    - name: Apply traffic SR-IOV network
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply
+          -f {{ osdc_manifest_dir }}/sriov-network.traffic.yaml
+      register: traffic_result
+      changed_when: >
+        'created' in traffic_result.stdout or
+        'configured' in traffic_result.stdout
+      run_once: true
+
+    - name: Apply OSDC1 SR-IOV node policy
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply
+          -f {{ osdc_manifest_dir }}/osdc-1-sriov-node.policy.yaml
+      register: osdc1_policy_result
+      changed_when: >
+        'created' in osdc1_policy_result.stdout or
+        'configured' in osdc1_policy_result.stdout
+      run_once: true
+
+    - name: Apply OSDC2 SR-IOV node policy
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply
+          -f {{ osdc_manifest_dir }}/osdc-2-sriov-node.policy.yaml
+      register: osdc2_policy_result
+      changed_when: >
+        'created' in osdc2_policy_result.stdout or
+        'configured' in osdc2_policy_result.stdout
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # OpenSpace license
+    # ------------------------------------------------------------------
+
+    - name: Find OpenSpace license file on KLM host
+      ansible.builtin.find:
+        paths: "{{ klm_home }}/license"
+        patterns: "*.json"
+        file_type: file
+      delegate_to: "{{ groups['klm_host'][0] }}"
+      register: openspace_license_files
+      run_once: true
+
+    - name: Verify exactly one OpenSpace license file exists
+      ansible.builtin.assert:
+        that:
+          - openspace_license_files.matched == 1
+        fail_msg: >-
+          Expected exactly one JSON license file in
+          {{ klm_home }}/license but found
+          {{ openspace_license_files.matched }}.
+      run_once: true
+
+    - name: Read OpenSpace license from KLM host
+      ansible.builtin.slurp:
+        src: "{{ openspace_license_files.files[0].path }}"
+      delegate_to: "{{ groups['klm_host'][0] }}"
+      register: openspace_license
+      run_once: true
+      no_log: true
+
+    - name: Write OpenSpace license to OSDC temporary directory
+      ansible.builtin.copy:
+        content: "{{ openspace_license.content | b64decode }}"
+        dest: "{{ osdc_manifest_dir }}/openspace_license.json"
+        owner: root
+        group: root
+        mode: "0600"
+      run_once: true
+      no_log: true
+
+    - name: Ensure openspace-licensing namespace exists
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail &&
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          create namespace openspace-licensing
+          --dry-run=client
+          -o yaml
+          |
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply -f -
+        executable: /bin/bash
+      register: openspace_licensing_namespace
+      changed_when: >
+        'created' in openspace_licensing_namespace.stdout or
+        'configured' in openspace_licensing_namespace.stdout
+      run_once: true
+
+    - name: Create or update OpenSpace license ConfigMap
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail &&
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          create configmap license-service
+          --namespace openspace-licensing
+          --from-file=openspace_license.json={{ osdc_manifest_dir }}/openspace_license.json
+          --dry-run=client
+          -o yaml
+          |
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          apply -f -
+        executable: /bin/bash
+      register: license_configmap_result
+      changed_when: >
+        'created' in license_configmap_result.stdout or
+        'configured' in license_configmap_result.stdout
+      run_once: true
+      no_log: true
+
+    - name: Show OpenSpace license ConfigMap result
+      ansible.builtin.debug:
+        msg: >-
+          OpenSpace license ConfigMap license-service configured
+          in namespace openspace-licensing.
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # Restart licensing service
+    # ------------------------------------------------------------------
+
+    - name: Find OpenSpace licensing service pod
+      ansible.builtin.shell:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          get pods
+          -n openspace-licensing
+          -o name
+          |
+          grep '^pod/openspace-osdc-os-licensing-service'
+      register: licensing_pod
+      changed_when: false
+      run_once: true
+
+    - name: Verify licensing service pod was found
+      ansible.builtin.assert:
+        that:
+          - licensing_pod.stdout_lines | length > 0
+        fail_msg: >-
+          Could not find the OpenSpace licensing service pod
+          in namespace openspace-licensing.
+      run_once: true
+
+    - name: Restart OpenSpace licensing service pod
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          delete
+          -n openspace-licensing
+          {{ licensing_pod.stdout_lines[0] }}
+      register: licensing_pod_delete
+      changed_when: true
+      run_once: true
+
+    - name: Wait for OpenSpace licensing service pod to become ready
+      ansible.builtin.command:
+        cmd: >-
+          {{ kubectl_path }}
+          --kubeconfig={{ kubeconfig_path }}
+          wait
+          --for=condition=Ready
+          pod
+          -n openspace-licensing
+          -l app=license-service
+          --timeout=300s
+      changed_when: false
+      run_once: true
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    - name: Remove temporary OSDC manifest directory
+      ansible.builtin.file:
+        path: "{{ osdc_manifest_dir }}"
+        state: absent
+      run_once: true

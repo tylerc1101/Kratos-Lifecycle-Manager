@@ -12,3 +12,11 @@
         mode: "0644"
       with_fileglob:
         - "{{ playbook_dir }}/../repos/*.repo"
+
+    - name: Stage license files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ klm_home }}/license/openspace_license.json"
+        mode: "0644"
+      with_fileglob:
+        - "{{ playbook_dir }}/../license/*"
