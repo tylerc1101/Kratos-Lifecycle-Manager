@@ -1,28 +1,54 @@
+# ============================================================
+# OpenSpace Semaphore Resources
+# ============================================================
+
 repositories:
   - name: OpenSpace
     url: file:///opt/openspace/bundles/openspace
     branch: main
 
 views:
-  - name: OpenSpace Tasks
+  - name: OpenSpace Tools
 
 templates:
   - name: Generate Config
     description: Generate the OpenSpace configuration for the selected system.
-    view: OpenSpace Tasks
+    view: OpenSpace Tools
     repository: OpenSpace
     playbook: playbooks/generate-config.yml
 
   - name: Push Images
     description: Push OpenSpace images to the target environment.
-    view: OpenSpace Tasks
+    view: OpenSpace Tools
     repository: OpenSpace
     app: bash
     playbook: scripts/push-images.sh
 
   - name: Start OpenSpace
     description: Start the OpenSpace deployment.
-    view: OpenSpace Tasks
+    view: OpenSpace Tools
     repository: OpenSpace
     app: bash
     playbook: scripts/start.sh
+
+workflows:
+  - name: Deploy Tooling
+    description: Generate configuration, push images, and start OpenSpace tooling.
+    view: OpenSpace Tools
+
+    nodes:
+      - id: generate_config
+        type: task
+        template: Generate Config
+
+      - id: push_images
+        type: task
+        template: Push Images
+
+      - id: start_openspace
+        type: task
+        template: Start OpenSpace
+
+    edges:
+      - {from: generate_config, to: push_images, condition: on_success}
+      - {from: push_images, to: start_openspace, condition: on_success}

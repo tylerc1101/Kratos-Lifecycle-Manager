@@ -1,82 +1,237 @@
+# ============================================================
+# Onboarder Semaphore Resources
+# ============================================================
+
 repositories:
   - name: Onboarder
     url: file:///opt/openspace/bundles/onboarder
     branch: main
 
 views:
-  - name: Onboarder Tasks
+  - name: Onboarder Tools
 
 templates:
-
   - name: Generate SSH Key
     description: Generate the SSH key used by the Onboarder deployment.
-    view: Onboarder Tasks
+    view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/generate-ssh-key.yml
 
   - name: Node Prep
-    description: Prepare a node for Kubernetes or OpenSpace deployment.
-    view: Onboarder Tasks
+    description: Prepare selected nodes for Onboarder/OpenSpace deployment.
+    view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/node-prep.yml
+    allow_override_args_in_task: true
 
   - name: Push SSH Key
-    description: Deploy the Onboarder SSH public key to selected nodes.
-    view: Onboarder Tasks
+    description: Push the Onboarder SSH key to selected nodes.
+    view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/push-ssh-key.yml
+    allow_override_args_in_task: true
 
-  - name: Prep Container
-    description: Prepare the Onboarder deployment container and configuration.
-    view: Onboarder Tasks
+  - name: Start Onboarder
+    description: Prepare and start the Onboarder deployment environment/container.
+    view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/start-onboarder.yml
 
   - name: Deploy Kubernetes
     description: Deploy the management Kubernetes cluster.
-    view: Onboarder Tasks
+    view: Onboarder Tools
     repository: Onboarder
     app: bash
-    playbook: scripts/run-make.sh
+    playbook: scripts/deploy-kubernetes.sh
 
   - name: Deploy Harbor
     description: Deploy Harbor.
-    view: Onboarder Tasks
+    view: Onboarder Tools
     repository: Onboarder
     app: bash
-    playbook: scripts/run-make.sh
+    playbook: scripts/deploy-harbor.sh
 
   - name: Deploy Rancher
     description: Deploy Rancher.
-    view: Onboarder Tasks
+    view: Onboarder Tools
     repository: Onboarder
     app: bash
-    playbook: scripts/run-make.sh
+    playbook: scripts/deploy-rancher.sh
 
   - name: Deploy Gitea
     description: Deploy Gitea.
-    view: Onboarder Tasks
+    view: Onboarder Tools
     repository: Onboarder
     app: bash
-    playbook: scripts/run-make.sh
+    playbook: scripts/deploy-gitea.sh
 
   - name: Deploy ArgoCD
     description: Deploy ArgoCD.
-    view: Onboarder Tasks
+    view: Onboarder Tools
     repository: Onboarder
     app: bash
-    playbook: scripts/run-make.sh
+    playbook: scripts/deploy-argocd.sh
 
   - name: Deploy OpenSpace Cluster
-    description: Deploy an OpenSpace Kubernetes cluster.
-    view: Onboarder Tasks
+    description: Deploy an OpenSpace cluster using operator/workflow supplied arguments.
+    view: Onboarder Tools
     repository: Onboarder
     app: bash
     playbook: scripts/deploy-openspace-cluster.sh
     allow_override_args_in_task: true
 
   - name: Post OSDC
-    description: Perform post-deployment configuration for the OSDC cluster.
-    view: Onboarder Tasks
+    description: Perform post-deployment OSDC configuration.
+    view: Onboarder Tools
     repository: Onboarder
     playbook: playbooks/post_osdc.yml
+
+# These workflows make the major Onboarder phases runnable independently.
+# The same task templates can also be referenced by an AFCGI end-to-end
+# workflow later without duplicating the actual automation.
+workflows:
+  - name: Onboarder Deployment
+    description: Deploy Onboarder and the management-cluster platform services.
+    view: Onboarder Tools
+
+    nodes:
+      - id: generate_ssh_key
+        type: task
+        template: Generate SSH Key
+
+      - id: prep_mcm
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - mcm
+
+      - id: push_ssh_key_mcm
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - mcm
+
+      - id: start_onboarder
+        type: task
+        template: Start Onboarder
+
+      - id: deploy_kubernetes
+        type: task
+        template: Deploy Kubernetes
+
+      - id: deploy_harbor
+        type: task
+        template: Deploy Harbor
+
+      - id: deploy_rancher
+        type: task
+        template: Deploy Rancher
+
+      - id: deploy_gitea
+        type: task
+        template: Deploy Gitea
+
+      - id: deploy_argocd
+        type: task
+        template: Deploy ArgoCD
+
+    edges:
+      - {from: generate_ssh_key, to: prep_mcm, condition: on_success}
+      - {from: prep_mcm, to: push_ssh_key_mcm, condition: on_success}
+      - {from: push_ssh_key_mcm, to: start_onboarder, condition: on_success}
+      - {from: start_onboarder, to: deploy_kubernetes, condition: on_success}
+      - {from: deploy_kubernetes, to: deploy_harbor, condition: on_success}
+      - {from: deploy_harbor, to: deploy_rancher, condition: on_success}
+      - {from: deploy_rancher, to: deploy_gitea, condition: on_success}
+      - {from: deploy_gitea, to: deploy_argocd, condition: on_success}
+
+  - name: OSMS Cluster Deployment
+    description: Prepare and deploy the OSMS OpenSpace cluster with operator approval gates.
+    view: Onboarder Tools
+
+    nodes:
+      - id: prep_osms
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: push_ssh_key_osms
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: deploy_osms_cluster
+        type: task
+        template: Deploy OpenSpace Cluster
+        task_params:
+          arguments: '["-e", "openspace-osms"]'
+
+      - id: approve_osms_cluster
+        type: approval
+        approval_message: Did the cluster deploy successfully?
+
+      - id: approve_osms_argocd
+        type: approval
+        approval_message: Did Argo CD deploy apps successfully?
+
+    edges:
+      - {from: prep_osms, to: push_ssh_key_osms, condition: on_success}
+      - {from: push_ssh_key_osms, to: deploy_osms_cluster, condition: on_success}
+      - {from: deploy_osms_cluster, to: approve_osms_cluster, condition: on_success}
+      - {from: approve_osms_cluster, to: approve_osms_argocd, condition: on_success}
+
+  - name: OSDC Cluster Deployment
+    description: Prepare and deploy the OSDC OpenSpace cluster with operator approval gates.
+    view: Onboarder Tools
+
+    nodes:
+      - id: prep_osdc
+        type: task
+        template: Node Prep
+        task_params:
+          params:
+            limit:
+              - osdc
+
+      - id: push_ssh_key_osdc
+        type: task
+        template: Push SSH Key
+        task_params:
+          params:
+            limit:
+              - osdc
+
+      - id: deploy_osdc_cluster
+        type: task
+        template: Deploy OpenSpace Cluster
+        task_params:
+          arguments: '["-e", "openspace-osdc"]'
+
+      - id: approve_osdc_cluster
+        type: approval
+        approval_message: Did the cluster deploy successfully?
+
+      - id: approve_osdc_argocd
+        type: approval
+        approval_message: Did Argo CD deploy apps successfully?
+
+      - id: post_osdc
+        type: task
+        template: Post OSDC
+
+    edges:
+      - {from: prep_osdc, to: push_ssh_key_osdc, condition: on_success}
+      - {from: push_ssh_key_osdc, to: deploy_osdc_cluster, condition: on_success}
+      - {from: deploy_osdc_cluster, to: approve_osdc_cluster, condition: on_success}
+      - {from: approve_osdc_cluster, to: approve_osdc_argocd, condition: on_success}
+      - {from: approve_osdc_argocd, to: post_osdc, condition: on_success}

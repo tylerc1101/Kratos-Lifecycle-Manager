@@ -1,46 +1,122 @@
+# ============================================================
+# BaseKit Semaphore Resources
+# ============================================================
+
 repositories:
   - name: BaseKit
     url: file:///opt/openspace/bundles/basekit
     branch: main
 
 views:
-  - name: BaseKit Tasks
+  - name: BaseKit
 
 templates:
-
   - name: Bootstrap MGMT KVM
-    description: Perform the initial BaseKit configuration of the management KVM host.
-    view: BaseKit Tasks
+    description: Initial management KVM setup, including packages and repositories.
+    view: BaseKit
     repository: BaseKit
     playbook: playbooks/bootstrap-mgmt-kvm.yml
 
   - name: Prepare OPNSense
-    description: Stage OPNSense installation content and generate the baseline config.xml.
-    view: BaseKit Tasks
+    description: Stage the OPNSense ISO and generate the baseline config.xml.
+    view: BaseKit
     repository: BaseKit
     playbook: playbooks/prepare-opnsense.yml
 
-  - name: Install OPNSense
-    description: Deploy the OPNSense virtual machine.
-    view: BaseKit Tasks
+  - name: Deploy OPNSense
+    description: Deploy the OPNSense virtual machine on the management KVM host.
+    view: BaseKit
     repository: BaseKit
-    app: bash
-    playbook: scripts/install_opnsense.sh
+    playbook: playbooks/deploy-opnsense.yml
 
   - name: Stage RHEL Image
-    description: Stage the RHEL golden image on the management KVM host.
-    view: BaseKit Tasks
+    description: Stage the RHEL qcow2 image on the management KVM host.
+    view: BaseKit
     repository: BaseKit
     playbook: playbooks/stage-rhel-image.yml
 
   - name: Deploy VMs
-    description: Deploy requested BaseKit virtual machines.
-    view: BaseKit Tasks
+    description: Deploy selected BaseKit virtual machines.
+    view: BaseKit
     repository: BaseKit
     playbook: playbooks/deploy-vms.yml
+    allow_override_args_in_task: true
 
   - name: Bootstrap Nodes
-    description: Configure newly deployed nodes with hostname, repositories, NTP, and baseline settings.
-    view: BaseKit Tasks
+    description: Configure selected nodes with NTP, repositories, hostname, and baseline settings.
+    view: BaseKit
     repository: BaseKit
     playbook: playbooks/bootstrap-nodes.yml
+    allow_override_args_in_task: true
+
+workflows:
+  - name: Infrastructure Install
+    description: Reusable BaseKit infrastructure installation without environment-specific AFCGI tasks.
+    view: BaseKit
+
+    nodes:
+      - id: bootstrap_mgmt_kvm
+        type: task
+        template: Bootstrap MGMT KVM
+
+      - id: prepare_opnsense
+        type: task
+        template: Prepare OPNSense
+
+      - id: deploy_opnsense
+        type: task
+        template: Deploy OPNSense
+
+      - id: stage_rhel_image
+        type: task
+        template: Stage RHEL Image
+
+      - id: deploy_mcm
+        type: task
+        template: Deploy VMs
+        task_params:
+          params:
+            limit:
+              - mcm
+
+      - id: bootstrap_mcm
+        type: task
+        template: Bootstrap Nodes
+        task_params:
+          params:
+            limit:
+              - mcm
+
+      - id: deploy_osms
+        type: task
+        template: Deploy VMs
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: bootstrap_osms
+        type: task
+        template: Bootstrap Nodes
+        task_params:
+          params:
+            limit:
+              - osms
+
+      - id: bootstrap_osdc
+        type: task
+        template: Bootstrap Nodes
+        task_params:
+          params:
+            limit:
+              - osdc
+
+    edges:
+      - {from: bootstrap_mgmt_kvm, to: prepare_opnsense, condition: on_success}
+      - {from: prepare_opnsense, to: deploy_opnsense, condition: on_success}
+      - {from: deploy_opnsense, to: stage_rhel_image, condition: on_success}
+      - {from: stage_rhel_image, to: deploy_mcm, condition: on_success}
+      - {from: deploy_mcm, to: bootstrap_mcm, condition: on_success}
+      - {from: bootstrap_mcm, to: deploy_osms, condition: on_success}
+      - {from: deploy_osms, to: bootstrap_osms, condition: on_success}
+      - {from: bootstrap_osms, to: bootstrap_osdc, condition: on_success}
