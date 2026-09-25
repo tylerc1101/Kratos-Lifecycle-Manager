@@ -5,7 +5,6 @@ KLM_CONTAINER="klm-engine"
 
 KLM_ROOT="/opt/openspace"
 KLM_BUNDLES="${KLM_ROOT}/bundles"
-KLM_CONFIG="${KLM_ROOT}/config"
 KLM_ENGINE="${KLM_ROOT}/engine"
 KLM_ENVIRONMENTS="${KLM_ROOT}/environments"
 KLM_REPOS="${KLM_ROOT}/repos"
@@ -229,7 +228,6 @@ start_klm() {
         --network host \
         --restart=always \
         -v "${KLM_BUNDLES}:${KLM_BUNDLES}:ro,z" \
-        -v "${KLM_CONFIG}:${KLM_CONFIG}:ro,Z" \
         -v "${KLM_ENVIRONMENTS}:${KLM_ENVIRONMENTS}:ro,Z" \
         -v "${KLM_REPOS}:${KLM_REPOS}:Z" \
         -v "${KLM_SSH}:${KLM_SSH}:ro,Z" \
@@ -1136,9 +1134,6 @@ EOF
     fi
 
     rm -rf "${KLM_STATE}"
-
-    # An API token tied to the old Semaphore database is no longer valid.
-    rm -f "${KLM_SECRETS}/semaphore_api_token"
 
     mkdir -p \
         "${KLM_KLM_STATE}" \

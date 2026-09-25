@@ -57,6 +57,7 @@ RUN dnf -y --allowerasing --nogpgcheck install \
         xfsprogs \
         policycoreutils \
         policycoreutils-python-utils \
+        vi \
         ${EXTRA_PACKAGES} \
     && dnf clean all \
     && rm -rf /var/cache/dnf

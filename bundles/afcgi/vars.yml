@@ -1,0 +1,23 @@
+---
+bundle_vars:
+
+  # ============================================================
+  # Networking
+  # ============================================================
+
+  wan_interface: eno8303
+  wan_bridge: br-wan
+
+  mgmt_interface: eno12399
+  mgmt_bridge: br-mgmt
+  mgmt_address: 192.168.2.6/24
+
+  idrac_interface: ens3f0
+  idrac_bridge: br-iDRAC
+  idrac_address: 192.168.0.4/24
+
+  # OpenSpace internal network
+  mgmt_network: 192.168.2.0/24
+  mgmt_cidr: 24
+  mgmt_gateway: 192.168.2.1
+  mgmt_dns: 192.168.2.1

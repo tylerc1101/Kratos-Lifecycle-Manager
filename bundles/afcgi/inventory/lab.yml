@@ -20,7 +20,7 @@ all:
         - elb.us-west-2.amazonaws.com
 
     opnsense:
-      wan_ip: 10.243.77.223
+      wan_ip: 10.243.76.221
       gateway: 10.243.76.1
       cidr: 23
 
@@ -32,7 +32,7 @@ all:
     klm_host:
       hosts:
         mgmt-kvm:
-          ansible_host: 10.243.77.213
+          ansible_host: 10.243.76.15
 
     vms:
       children:

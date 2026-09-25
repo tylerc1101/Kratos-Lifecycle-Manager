@@ -32,24 +32,24 @@ profiles:
       - name: "{system}"
 
     templates:
-      - name: "{system} MGMT KVM Networking"
+      - name: "MGMT KVM Networking"
         description: Build the AFCGI management KVM network bridges.
-        view: "{system}"
+        view: "AFCGI"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/mgmt-kvm-networking.yml
 
-      - name: "{system} Stage Repositories"
+      - name: "Stage Repositories"
         description: Copy AFCGI repository files to /opt/openspace/repos on the selected host(s).
-        view: "{system}"
+        view: "AFCGI"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/stage-repos.yml
         allow_override_args_in_task: true
 
-      - name: "{system} Change OPNSense Settings"
+      - name: "Change OPNSense Settings"
         description: Apply AFCGI-specific settings to the generated OPNSense configuration.
-        view: "{system}"
+        view: "AFCGI"
         repository: AFCGI Environment
         inventory: "{system}"
         playbook: playbooks/change-opnsense-settings.yml
@@ -66,11 +66,11 @@ profiles:
         nodes:
           - id: mgmt_kvm_networking
             type: task
-            template: "{system} MGMT KVM Networking"
+            template: "MGMT KVM Networking"
 
           - id: stage_repositories
             type: task
-            template: "{system} Stage Repositories"
+            template: "Stage Repositories"
             task_params:
               params:
                 limit:
@@ -86,7 +86,7 @@ profiles:
 
           - id: change_opnsense_settings
             type: task
-            template: "{system} Change OPNSense Settings"
+            template: "Change OPNSense Settings"
 
           - id: deploy_opnsense
             type: task

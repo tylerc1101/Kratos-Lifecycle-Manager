@@ -18,6 +18,11 @@ profiles:
         version: 1.0.0
 
 systems:
+  - name: LAB
+    enabled: true
+    profile: ground
+    description: AFCGI LAB ground system
+    
   - name: SKCT1
     enabled: true
     profile: ground
