@@ -230,7 +230,7 @@ start_klm() {
         --restart=always \
         -v "${KLM_BUNDLES}:${KLM_BUNDLES}:ro,z" \
         -v "${KLM_ENVIRONMENTS}:${KLM_ENVIRONMENTS}:ro,Z" \
-        -v "${KLM_LICENSE}:${KLM_LICENSE}:ro,Z" \
+        -v "${KLM_LICENSE}:${KLM_LICENSE}:Z" \
         -v "${KLM_REPOS}:${KLM_REPOS}:Z" \
         -v "${KLM_SSH}:${KLM_SSH}:ro,Z" \
         -v "${KLM_STAGING}:${KLM_STAGING}:ro,z" \

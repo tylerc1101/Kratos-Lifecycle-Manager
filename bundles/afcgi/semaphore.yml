@@ -36,12 +36,12 @@ profiles:
         inventory: "{system}"
         playbook: playbooks/mgmt-kvm-networking.yml
 
-      - name: Stage Repositories
+      - name: Stage Files
         description: Copy AFCGI repository files to /opt/openspace/repos on the management KVM host.
         view: AFCGI
         repository: AFCGI Environment
         inventory: "{system}"
-        playbook: playbooks/stage-repos.yml
+        playbook: playbooks/stage-files.yml
         task_params:
           allow_override_limit: true
           limit: []
@@ -66,9 +66,9 @@ profiles:
             type: task
             template: MGMT KVM Networking
 
-          - id: stage_repositories
+          - id: stage_files
             type: task
-            template: Stage Repositories
+            template: Stage Files
 
           - id: bootstrap_mgmt_kvm
             type: task
@@ -131,8 +131,8 @@ profiles:
                   - osdc
 
         edges:
-          - {from: mgmt_kvm_networking, to: stage_repositories, condition: on_success}
-          - {from: stage_repositories, to: bootstrap_mgmt_kvm, condition: on_success}
+          - {from: mgmt_kvm_networking, to: stage_files, condition: on_success}
+          - {from: stage_files, to: bootstrap_mgmt_kvm, condition: on_success}
           - {from: bootstrap_mgmt_kvm, to: prepare_opnsense, condition: on_success}
           - {from: prepare_opnsense, to: change_opnsense_settings, condition: on_success}
           - {from: change_opnsense_settings, to: deploy_opnsense, condition: on_success}
@@ -158,9 +158,9 @@ profiles:
             type: task
             template: MGMT KVM Networking
 
-          - id: stage_repositories
+          - id: stage_files
             type: task
-            template: Stage Repositories
+            template: Stage Files
 
           - id: bootstrap_mgmt_kvm
             type: task
@@ -341,8 +341,8 @@ profiles:
 
         edges:
           # AFCGI Ground Infrastructure
-          - {from: mgmt_kvm_networking, to: stage_repositories, condition: on_success}
-          - {from: stage_repositories, to: bootstrap_mgmt_kvm, condition: on_success}
+          - {from: mgmt_kvm_networking, to: stage_files, condition: on_success}
+          - {from: stage_files, to: bootstrap_mgmt_kvm, condition: on_success}
           - {from: bootstrap_mgmt_kvm, to: prepare_opnsense, condition: on_success}
           - {from: prepare_opnsense, to: change_opnsense_settings, condition: on_success}
           - {from: change_opnsense_settings, to: deploy_opnsense, condition: on_success}

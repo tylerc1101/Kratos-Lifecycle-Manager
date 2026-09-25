@@ -129,6 +129,9 @@
         group: kratos
         mode: "0755"
       loop:
+        - src: ../templates/klm_scripts/deploy-all.sh.j2
+          dest: deploy-all
+
         - src: ../templates/klm_scripts/deploy-kubernetes.sh.j2
           dest: deploy-kubernetes
 
@@ -152,6 +155,7 @@
           /tmp/klm_scripts/{{ item }}
           onboarder:/usr/local/bin/{{ item }}
       loop:
+        - deploy-all
         - deploy-kubernetes
         - deploy-harbor
         - deploy-rancher

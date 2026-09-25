@@ -1,7 +1,6 @@
 ---
 - name: Stage repository configuration
-  hosts: localhost
-  connection: local
+  hosts: mgmt-kvm
   gather_facts: false
 
   tasks:

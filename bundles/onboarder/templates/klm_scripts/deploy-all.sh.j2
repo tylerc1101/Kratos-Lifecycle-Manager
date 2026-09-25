@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+make ansible-deploy-rke2-cluster ENVIRONMENT={{ env_name }}
+make bootstrap-container-images-run ENVIRONMENT={{ env_name }}
+make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{ env_name }}
+make load-darksite-bundles ENVIRONMENT={{ env_name }}
+make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{ env_name }}
+make terraform-rancher-bootstrap-apply ENVIRONMENT={{ env_name }}
+make install-gitea ENVIRONMENT={{ env_name }}
+make install-argocd ENVIRONMENT={{ env_name }}
