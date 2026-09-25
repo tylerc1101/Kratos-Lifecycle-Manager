@@ -10,7 +10,7 @@ fi
 BUNDLE_ROOT="/opt/Kratos-Lifecycle-Manager/bundles"
 BUNDLE_DIR="${BUNDLE_ROOT}/${1}"
 
-PUBLISH_DIR="${PUBLISH_DIR:-/opt/klm-repository/bundles}"
+PUBLISH_DIR="${PUBLISH_DIR:-/var/opt/klm-repository/bundles}"
 
 if [ ! -d "${BUNDLE_DIR}" ]; then
     echo "ERROR: Bundle directory does not exist:"

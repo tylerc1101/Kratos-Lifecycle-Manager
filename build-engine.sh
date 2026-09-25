@@ -7,7 +7,7 @@ PROJECT_ROOT="/opt/Kratos-Lifecycle-Manager"
 ENGINE_DIR="${PROJECT_ROOT}/engine"
 VERSION_FILE="${ENGINE_DIR}/VERSION"
 
-PUBLISH_DIR="${PUBLISH_DIR:-/opt/klm-repository/engine}"
+PUBLISH_DIR="${PUBLISH_DIR:-/var/opt/klm-repository/engine}"
 
 IMAGE_NAME="klm-engine"
 
