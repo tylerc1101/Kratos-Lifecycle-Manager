@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="/opt/Kratos-Lifecycle-Manager"
+PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 ENGINE_DIR="${PROJECT_ROOT}/engine"
 VERSION_FILE="${ENGINE_DIR}/VERSION"

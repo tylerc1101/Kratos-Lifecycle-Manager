@@ -7,7 +7,7 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-BUNDLE_ROOT="/opt/Kratos-Lifecycle-Manager/bundles"
+BUNDLE_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 BUNDLE_DIR="${BUNDLE_ROOT}/${1}"
 
 PUBLISH_DIR="${PUBLISH_DIR:-/var/opt/klm-repository/bundles}"
